@@ -1,0 +1,10 @@
+syntax: glob
+
+.hgignore~
+.hgsub~
+
+.build/**
+*.swp
+
+syntax: regexp
+\.[s,d,b]\#\d
