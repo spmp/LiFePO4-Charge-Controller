@@ -35,3 +35,48 @@ void get_state(struct Process *process) {
     outputs->pwm_duty = get_pwm_duty(PWM_CHAN_A, ABSOLUTE);
     outputs->charge_progress = get_SoC(ABSOLUTE);
 }
+
+
+/**
+ * @brief Controll the process; Charging LiFePO4 batteries
+ * 
+ * This is the master process to manage the inputs and outputs for managing
+ * two HP 3kW PSU's in order to charge and protect a 28*3.2V@100Ah LiFePO4 
+ * battery bank
+ * 
+ * The task is generally
+ *  * Read inputs and systems state 
+ *  * Make descisions on what to do based on that state
+ *  * Check for out of bounds and emergency conditions
+ *  * Set the outputs
+ * 
+ * We are aiming for the ability to manage different charging models.
+ * This can be achieved through selection by different 
+ * 'processes' via the 'process_number' variable of our struct.
+ *  This 'process' only effects the descision stage of the process-control
+ * 
+ *  Process 1
+ *  ---------
+ *  brief Constant current charging up to a set voltage 
+ * 
+ *  we will check whether a battery is connected, and its voltage is below the cut off
+ *  If it is then we will
+ *      Set the PWM to a minimum value
+ *      Turn on the PSU's 
+ *      Begin constant current charging via PID on current sense to PWM duty cycle
+ *  Once the set point is reached we
+ *      Turn off the PSU's and start a 'rest' counter
+ *      If the constant current time was very small then the rest counter is very small.w 
+ *      In the future we could record the Ah and time etc
+ *  Once the 'rest' counter has timed out we can go to constant voltage float
+ *      Set the PWM to a minimum value
+ *      Turn on the PSU's 
+ *      Begin constant voltage charging via PID on voltage sense to PWM duty cycle
+ *  At any stage the process can be killed or started with a push button LED.
+ * 
+ *  More details of this particular process are in the c. file
+ * @param *process, a struct of type Process in which to save the system state
+ **/
+void process_control(struct Process *process)
+{
+    

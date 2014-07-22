@@ -29,7 +29,12 @@ void once_per_second() {
 // }
 
 
-    struct Process process;
+//     struct Process process;
+    struct Process process = {
+    {0},
+    {0},
+    {1,4000,3000,10500,10220,9660,7200,70,40}
+};
 
 int main() {
     cli();
