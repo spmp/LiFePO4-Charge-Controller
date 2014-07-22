@@ -13,7 +13,7 @@
 
 
 # ========== Edit below here ========= #
-SOURCES = main.c AVR-lib/timers.c AVR-lib/usart.c command.c AVR-lib/i2c_safe.c log.c hardware.c
+SOURCES = main.c AVR-lib/timers.c AVR-lib/usart.c command.c AVR-lib/i2c_safe.c AVR-lib/adc.c AVR-lib/lib/pid.c log.c hardware.c
 PORT = /dev/ttyUSB*
 BAUD_RATE = 57600
 MCU = atmega328p

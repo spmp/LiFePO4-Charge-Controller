@@ -16,22 +16,19 @@ void once_per_second() {
     PORTB ^= (1 << PORTB5); //Toggle LED
 }
 
-void medium_timestep() {
-    begin_state_machine_flag = 1;
-}
+// void medium_timestep() {
+//     begin_state_machine_flag = 1;
+// }
 
 
 int main() {
     cli();
     set_sleep_mode(SLEEP_MODE_IDLE);
     init_hardware();
-    //AT30TSE758_init(0x48);
-    
-//     DDRB |= (1 << DDB5);
     
     //Set timer callbacks
     clock_set_seconds_callback(&once_per_second);
-    clock_set_medium_time_callback(&medium_timestep);
+//     clock_set_medium_time_callback(&medium_timestep);
     
     //USART line handler
     usart_set_handle_char_string_from_serial(&handle_line);
@@ -48,9 +45,9 @@ int main() {
             handle_single_char_from_serial();
         }
         
-        //State machine 
-        if ( begin_state_machine_flag ) {
-            begin_state_machine_flag = 0;
+//         //State machine 
+//         if ( begin_state_machine_flag ) {
+//             begin_state_machine_flag = 0;
 //             state_machine(&program[state_machine_program]);
 //             state_machine(&program);
         }
