@@ -1,8 +1,27 @@
-/*Application specific commands to handle USART input strings */
+/*This file has been prepared for Doxygen automatic documentation generation.*/
+/** 
+ * @file command.h
+ *
+ * @brief Header for command.c, application specific commands to handle USART input strings
+ *
+ * - Compiler:          gcc-avr
+ * - Project:           LiFePO4 Charge Controller
+ * - uC                 AVR Mega328p on Arduino Nano board
+ * 
+ * @author              Jasper Aorangi
+ * @Date: July 2014
+ *****************************************************************************/
 #pragma once
 #include <avr/io.h>
 #include <stdlib.h>
-#include "usart.h"
+#include <avr/pgmspace.h>
+#include <util/delay.h>
+#include "AVR-lib/usart.h"
+#include "AVR-lib/timers.h"
+#include "AVR-lib/i2c_safe.h"
+#include "hardware.h"
+#include "log.h"
+#include "process-control.h"
 
 /* Key presses for serial interface */
 #define USART_KEY_LEVEL l
@@ -37,6 +56,6 @@
 void handle_line(const char* line);
 
 /* Take action on command name and command value */
-void command_from_serial(char commandname, uint32_t commandvalue, struct Program *program);
+void command_from_serial(char commandname, uint32_t commandvalue, struct Process *process);
 
 

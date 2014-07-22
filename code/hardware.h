@@ -1,10 +1,9 @@
 /*This file has been prepared for Doxygen automatic documentation generation.*/
 /** 
- * @file *********************************************************************
+ * @file hardware.h
  *
  * @brief Header for Hardware.c, setting up project specific Hardware
  *
- * - File:              hardware.h
  * - Compiler:          gcc-avr
  * - Project:           LiFePO4 Charge Controller
  * - uC                 AVR Mega328p on Arduino Nano board
@@ -36,10 +35,10 @@
  *              @I2Caddress 0xA0
  *                  ... to ...
  *              @I2Caddress 0xAE
- *          @var current, uint16, A*100
+ *          @var current, uint16, mA
  *      Voltage sensing via a 100:1 divider with zener protection to int. ADC
  *          @resource ADC0/PC0, internal 10bit, 1.1Vref, giving resolution of 0.11V (Arduino Nano A0)
- *          @var voltage, uint16, V*100
+ *          @var voltage, uint16, mV
  *              OR
  *          @resource I2C, to 16bit ADC
  *          @resource PC5, I2C SCL
@@ -63,9 +62,19 @@
  *          @resource ???
  **/
 
+/** Outupt type defines: **/
+#define ABSOLUTE        0       // Absolute value of variable under inspection
+#define PERCENT         1       // Percentage*100
+
+/** PWM Channel names **/
+#define PWM_CHAN_A      0
+#define PWM_CHAN_B      1
+
 /* Project specific defines */
 #define USART_BAUDE     38400   //Highest stable Baude at 16MhZ FCPU
 #define I2C_FREQ        100000  //Limit for the HP PSU
+#define PWM_TOP         0xFFFF  // PWM TOP value, 16bit.
+#define DESIGN_SOC      8960    // System design State of Charge in Ah
 
 /* Hardware specific defines: */
 #define ONBOARD_LEDPort PORTB
@@ -85,3 +94,39 @@
  * One call to rule them all
  */
 void init_hardware(void);
+
+/**
+ * The followng are functions abstacting measurements into internal values.
+ **/
+
+/**
+ * @brief Get voltage measurement, taking into consideration protection diode drop
+ * 
+ * @return uint16, the corrected voltage in mV
+ **/
+uint16_t get_voltage( void );
+
+/**
+ * @brief Get the current flowing through the system
+ * 
+ * @return uint16, the current in A*100
+ **/
+uint16_t get_current( void );
+
+/**
+ * @brief Get the state of charge of the batteries
+ * 
+ * Gets the state of charge in Ah or percentage*100
+ * @var type, see defines
+ * @return uint16, the state of charge
+ **/
+uint16_t get_SoC( uint8_t op_type );
+
+/**
+ * @brief Get the PWM duty cycle
+ * 
+ * @var channel, PWM channel, see defines 
+ * @var type, see defines
+ * @return uint16, the pwm duty cycle
+ **/
+uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type );

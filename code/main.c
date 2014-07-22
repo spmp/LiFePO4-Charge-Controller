@@ -4,13 +4,21 @@
 #include <util/delay.h>
 
 #include "hardware.h"
-
-// #include "state-machine.h"
+#include "process-control.h"
 #include "command.h"
 #include "log.h"
 
+/**
+ * @var send_log, whether to log to USART or not
+ **/
 uint8_t send_log = 0;
 
+/**
+ * @brief function to be called from the once per second clock ISR
+ * 
+ * Activates the log send
+ * Toggles the LED
+ **/
 void once_per_second() {
     send_log = 1;
     PORTB ^= (1 << PORTB5); //Toggle LED
@@ -20,6 +28,8 @@ void once_per_second() {
 //     begin_state_machine_flag = 1;
 // }
 
+
+    struct Process process;
 
 int main() {
     cli();
@@ -34,9 +44,7 @@ int main() {
     usart_set_handle_char_string_from_serial(&handle_line);
     
     sei();
-
-//     struct Program program;
-
+    
     for (;;) {
         sleep_mode(); // blocked until after an interrupt has fired
         
@@ -48,15 +56,14 @@ int main() {
 //         //State machine 
 //         if ( begin_state_machine_flag ) {
 //             begin_state_machine_flag = 0;
-//             state_machine(&program[state_machine_program]);
-//             state_machine(&program);
-        }
+//             state_machine(&process[state_machine_process]);
+//             state_machine(&process);
+//         }
         
         //Logging
         if (send_log) {
             send_log = 0;
-            log_to_serial(&program[state_machine_program]);
-//             log_to_serial(&program);
+            log_to_serial(&process);
         }
     }
 
