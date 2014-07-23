@@ -12,6 +12,8 @@
  * @Date: July 2014
  *****************************************************************************/
 #include "log.h"
+#include "process-control.h"
+#include "AVR-lib/lib/pid.h"
 
 uint8_t logenable = LOG_ENABLE; //logging enabled/disabled at startup
 
@@ -19,6 +21,7 @@ uint8_t logenable = LOG_ENABLE; //logging enabled/disabled at startup
 void log_to_serial(struct Process *process) {
     struct Inputs *inputs = &process->inputs;
     struct Outputs *outputs = &process->outputs;
+    struct Settings *settings = &process->settings;
     
     //Temporarily disabled logging
     if ( logenable ){
@@ -28,15 +31,26 @@ void log_to_serial(struct Process *process) {
         send_uint16(inputs->current);
         send_string_p(PSTR(" v "));
         send_uint16(inputs->voltage);
-        send_string_p(PSTR(" SoC "));
-        send_uint16(outputs-> charge_progress);
+        send_string_p(PSTR(" SetPoint "));
+        send_uint16(settings->charged_voltage);
+        send_string_p(PSTR(" PID "));
+        send_uint16(outputs->Ah_count);
         send_string_p(PSTR(" pwm "));
-        send_char(outputs->pwm_duty);
-//         send_string_p(PSTR(" P "));
-//         send_char('0'+pump_state());
-//         send_string_p(PSTR(" f "));
-//         send_char('0'+outputs->fill);
-//         send_string_p(PSTR(" F "));
+        send_uint16(outputs->pwm_duty);
+        send_string_p(PSTR(" P "));
+        send_uint16(pidData_cv.P_Factor);
+        send_string_p(PSTR(" I "));
+        send_uint16(pidData_cv.I_Factor);
+        send_string_p(PSTR(" D "));
+        send_uint16(pidData_cv.D_Factor);
+        send_string_p(PSTR(" LastVal "));
+        send_uint16(pidData_cv.lastProcessValue);
+        send_string_p(PSTR(" SumEr "));
+        send_uint32(pidData_cv.sumError);
+//         send_string_p(PSTR(" MaxEr "));
+//         send_uint32(pidData_cv.maxError);
+//         send_string_p(PSTR(" MaxSumEr "));
+//         send_uint32(pidData_cv.maxSumError);
 //         send_char('0'+fill_state());
 //         send_string_p(PSTR(" h "));
 //         send_char('0'+outputs->heating);

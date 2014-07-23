@@ -14,6 +14,14 @@
 #pragma once
 #include <avr/io.h>
 #include "hardware.h"
+#include "AVR-lib/lib/pid.h"
+#include <avr/io.h>
+#include "AVR-lib/usart.h"
+#include "AVR-lib/clock.h"
+
+extern uint8_t begin_process_control_flag;
+extern uint8_t process_control_running_flag;
+extern struct u_PID_DATA pidData_cv;     // PID data for constant voltage
 
 struct Inputs {
     uint16_t voltage;           // Voltage across the terminals in v*100
@@ -31,10 +39,10 @@ struct Inputs {
 struct Outputs {
     uint16_t pwm_duty;          // Duty cycle of pwm_duty
     uint8_t  PSU_state;         // State of the PSU's
-    uint16_t Ah_count;          // How many Ah's have passed through the charger in this cycle
+    int16_t Ah_count;          // How many Ah's have passed through the charger in this cycle
     uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
-    uint16_t cur_rest_time;     // How long have we
-    uint16_t rest_timer;        // How long have we been resting?
+    uint16_t cur_rest_time;     // How long have we been resting?
+    uint16_t rest_timer;        // How long do we need to rest for?
     uint8_t  charge_state;      // State of charging, Bulk, rest, float, Done
     uint8_t  charge_progress;   // Percentage of charging done.
 };
@@ -49,6 +57,13 @@ struct Settings {
     uint16_t rest_time;         // Time between charged voltage and driving or float/done. This is in seconds per Ah
     uint16_t max_PSU_temp;      // Maximum temperature for any PSU before shutdown
     uint16_t max_battery_temp;  // Maximum temperature of any battery before shutdown.
+    /** PID **/
+    int16_t cc_P_Factor;        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR
+    int16_t cc_I_Factor;        //! The cc Integral tuning constant, multiplied with SCALING_FACTOR
+    int16_t cc_D_Factor;        //! The cc Derivative tuning constant, multiplied with SCALING_FACTOR
+    int16_t cv_P_Factor;        //! The cv Proportional tuning constant, multiplied with SCALING_FACTOR
+    int16_t cv_I_Factor;        //! The cv Integral tuning constant, multiplied with SCALING_FACTOR
+    int16_t cv_D_Factor;        //! The cv Derivative tuning constant, multiplied with SCALING_FACTOR
 };
 
 struct Process {
@@ -62,11 +77,37 @@ struct Process {
  **/
 extern struct Process process;
 
+/** 
+ * @brief Initialise the PID from Process struct
+ * @param *process, a struct of type Process in which get the pid initialisation variables
+ **/
+void init_PID(struct Process *process);
+
 /**
  * @brief Get the state of the system, input values and output states
  * @param *process, a struct of type Process in which to save the system state
  **/
 void get_state(struct Process *process);
+
+/**
+ * @brief Calculate the outputs in order to controll the process
+ * @param *process, a struct of type Process in which to save the system state
+ **/
+void calculate_outputs(struct Process *process);
+
+/**
+ * @brief Check that no inputs or propoesd outputs will break anything
+ * 
+ * @param *process, a struct of type Process in which to save the system state
+ **/
+void check_limits(struct Process *process);
+
+/**
+ * @brief Set the calculated outputs to hardware
+ * 
+ * @param *process, a struct of type Process in which to save the system state
+ **/
+void set_outputs(struct Process *process);
 
 /**
  * @brief Controll the process; Charging LiFePO4 batteries

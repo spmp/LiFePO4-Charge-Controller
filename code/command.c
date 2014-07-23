@@ -12,6 +12,7 @@
  * @Date: July 2014
  *****************************************************************************/
 #include "command.h"
+#include "process-control.h"
 
 uint8_t eloaded;
 uint8_t wloaded;
@@ -148,17 +149,10 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
                 send_newline();
             }
             break;
-//             
-//         case 'F': //Filler
-//             if (commandvalue != 1){
-//                 settings->fill_enable = 0;
-//                 send_string_p(PSTR("Filler disabled, enable with 'F1'.\r\n"));
-//             }
-//             else {
-//                 settings->fill_enable = 1;
-//                 send_string_p(PSTR("Filler enabled, disable with 'F0'.\r\n"));
-//             }
-//             break;
+            
+        case 'F': //Filler
+            settings->charged_voltage = commandvalue;
+            break;
 //             
 //         case 'H': //Heater
 //             if (commandvalue != 1){
