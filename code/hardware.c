@@ -13,6 +13,10 @@
  *****************************************************************************/
 #include "hardware.h"
 
+//Initialise the PSU_state
+// struct PSU_state psu_state = {0};
+
+
 /**
  * @brief Initialise hardware 
  * 
@@ -95,5 +99,67 @@ uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type )
         else {
             return ((uint32_t)OCR1B*10000)/PWM_TOP;
         }
+    }
+}
+
+
+/**
+ * @brief Get the state of the PSUs via I2C
+ * 
+ * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
+ **/
+void get_psu_state(struct PSU_state *psu_struct)
+{
+    // USE I2C reads to get the states
+    psu_struct->PSU1_current = 10;      // PSU1 current
+    psu_struct->PSU1_temperature = 20;  // PSU1 Temperature
+    psu_struct->PSU1_line_voltage= 240; // PSU1 Line voltage
+    psu_struct->PSU2_current = 11;      // PSU2 current
+    psu_struct->PSU2_temperature = 30;  // PSU2 Temperature
+    psu_struct->PSU2_line_voltage = 240; // PSU2 Line voltage
+}
+
+/**
+ * @brief Get PSU's current
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct)
+{
+    if (psu_number == 2 ) {
+        return psu_struct->PSU2_current;
+    }
+    else {
+        return  psu_struct->PSU1_current;
+    }
+}
+
+/**
+ * @brief Get PSU's voltage
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct)
+{
+    if (psu_number == 2 ) {
+        return psu_struct->PSU2_line_voltage;
+    }
+    else {
+        return  psu_struct->PSU1_line_voltage;
+    }
+}
+
+/**
+ * @brief Get PSU's temperature
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct)
+{
+    if (psu_number == 2 ) {
+        return psu_struct->PSU2_temperature;
+    }
+    else {
+        return  psu_struct->PSU1_temperature;
     }
 }

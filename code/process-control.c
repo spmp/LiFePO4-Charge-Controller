@@ -13,29 +13,43 @@
  *****************************************************************************/
 #include "process-control.h"
 
+/**
+ * @brief Variables that control whether the process_control is able to run (again)
+ * 
+ * @var begin_process_control_flag
+ * Flag that indicates that process should run
+ * @var process_control_running_flag
+ * Flag that indicates process_control is running
+ * @var process_control_enable
+ * Flag for global enable/disable of process_control
+ **/
 uint8_t begin_process_control_flag = 0;
 uint8_t process_control_running_flag = 0;
 uint8_t process_control_enable = 1;               //enabled by default
+
+/**
+ * @brief Variables used by the actual programmes running in calculate_outputs
+ * 
+ * @var setpoint_reached_counter
+ * When the setpoint is reached start counting cycles that this is true
+ * @var rest_count
+ * How long have we been resting for. May be redundant if we decriment rest timer.
+ * @var
+ * @def SETPOINT_REACHED_COUNT
+ * How many counts of setpoint_reached_counter to count for
+ **/
+#define SETPOINT_REACHED_COUNT      100
+uint8_t setpoint_reached_counter=0;
 
 /** @brief struct(s) for PID **/
 struct u_PID_DATA pidData_cc;    // PID data for constant current
 struct u_PID_DATA pidData_cv;    // PID data for constant voltage
 // = {   // PID data for constant voltage
-//     .lastProcessValue = 0,//! Last process value, used to find derivative of process value.
-//     .sumError = 0,//! Summation of errors, used for integrate calculations
-//     .P_Factor = 1,//! The Proportional tuning constant, multiplied with SCALING_FACTOR
-//     .I_Factor = 0,//! The Integral tuning constant, multiplied with SCALING_FACTOR
-//     .D_Factor = 0,//! The Derivative tuning constant, multiplied with SCALING_FACTOR
-//     .maxError = MAX_UINT,//! Maximum allowed error, avoid overflow
-//     .maxSumError = MAX_LONG//! Maximum allowed sumerror, avoid overflow
-// };
 
-/** @brief struct Process process **/
-// struct Process process = {
-// {0},
-// {0},
-// {1,4000,3000,10500,10220,9660,7200,70,40}
-// };
+/** @brief struct PSU_state psu_state for storing PSU data **/
+struct PSU_state psu_state = {0};
+
+/** @brief struct Process process for program 1 **/
 struct Process process = {
     {0},
     {
@@ -46,27 +60,34 @@ struct Process process = {
     .cur_rest_time = 50,     // How long have we been resting?
     .rest_timer = 60,        // How long do we need to rest for?
     .charge_state = 70,      // State of charging, Bulk, rest, float, Done
-    .charge_progress = 80   // Percentage of charging done.
+    .error_code = 0,         // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
+    .charge_progress = 80    // Percentage of charging done.
     },
     {
-    .process_number = 1,    // An index for the process, such that process_control knows with process to run.
-    .current_max = 4000,       // Absolute maximum current. Shutdown if over
-    .charge_current = 3000,    // Current to charge the batteries at
-    .voltage_max = 10500,       // Absolute maximum battery voltage. Shutdown if over
-    .charged_voltage = 3000,   // Voltage at which to stop bulk charging
-    .float_voltage = 9660,     // Voltage at which to float the batteries
+    .program_number = 1,     // An index for the process, such that process_control knows with process to run.
+    .current_max = 4000,     // Absolute maximum current. Shutdown if over
+    .current_threhold = 3500,// Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
+    .current_charge = 30000, // Current to charge the batteries at
+    .voltage_max = 10500,    // Absolute maximum battery voltage. Shutdown if over
+    .voltage_min = 8300,       // Minimum battery voltage. Error or batteries disconnected if under.
+    .voltage_threshold = 10300, // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
+    .voltage_charged = 3000, // Voltage at which to stop bulk charging
+    .voltage_float = 9660,   // Voltage at which to float the batteries
     .rest_time = 36,         // Time between charged voltage and driving or float/done. This is in seconds per Ah
     .max_PSU_temp = 70,      // Maximum temperature for any PSU before shutdown
+    .max_PSU_volt = 300,     // Maximum PSU line voltage
+    .min_PSU_volt = 200,     // Minimum PSU voltage
     .max_battery_temp = 50,  // Maximum temperature of any battery before shutdown.
     /** PID **/
     .cc_P_Factor = 1,        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR
     .cc_I_Factor = 0,        //! The cc Integral tuning constant, multiplied with SCALING_FACTOR
     .cc_D_Factor = 0,        //! The cc Derivative tuning constant, multiplied with SCALING_FACTOR
-    .cv_P_Factor = 4,        //! The cv Proportional tuning constant, multiplied with SCALING_FACTOR
+    .cv_P_Factor = 3,        //! The cv Proportional tuning constant, multiplied with SCALING_FACTOR
     .cv_I_Factor = 0,        //! The cv Integral tuning constant, multiplied with SCALING_FACTOR
-    .cv_D_Factor = 3        //! The cv Derivative tuning constant, multiplied with SCALING_FACTOR
+    .cv_D_Factor = 3         //! The cv Derivative tuning constant, multiplied with SCALING_FACTOR
     }
 };
+
 /** 
  * @brief Initialise the PID from Process struct
  * @param *process, a struct of type Process in which get the pid initialisation variables
@@ -89,8 +110,11 @@ void get_state(struct Process *process) {
     struct Outputs *outputs = &process->outputs;
     
     // Get the external states
+    get_psu_state(&psu_state);
+//     get_PSU_state(2);
     inputs->voltage = get_voltage();
-    inputs->current = get_current();
+//     inputs->current = get_current();
+    inputs->current = (psu_state.PSU1_current+psu_state.PSU1_current)/2;
     
     // Get the internal states
     outputs->pwm_duty = get_pwm_duty(PWM_CHAN_A, ABSOLUTE);
@@ -111,9 +135,133 @@ void calculate_outputs(struct Process* process)
     struct Outputs *outputs = &process->outputs;
     struct Settings *settings = &process->settings;
     
-    outputs->Ah_count = u_pid_Controller(settings->charged_voltage, inputs->voltage, &pidData_cv);
+    outputs->Ah_count = u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
     outputs->pwm_duty += (int32_t)(outputs->Ah_count/8);
     
+    /** The actual process control is as follows: **/
+    
+    /** Which 'program' are we running? **/
+    switch(settings->program_number) {
+        
+        //We only have one program at the moment, so as a catchall lets do:
+        default:
+            /** Where are we in the charging cycle? **/
+            switch(outputs->charge_state) {
+                // Not charging
+                case 0:
+                    /** 
+                     * @brief Transition from not charging to charging
+                     * 
+                     * We assume that we are not charging because the process
+                     * has just begun in which case we must make sure that it is
+                     * safe to begin to charge as such we need to:
+                     * -# Check the battery voltage
+                     *  - if it is high, then charging is done
+                     *  - if it low then there is an error and we need to stop immediatly
+                     * -# Reduce the ouput signal to a safe level
+                     * -# Check the state of the PSU's
+                     *  - Temperature
+                     *  - Line voltage
+                     *  If all is fine progress, otherwie fire an error and stop
+                     * -# Power on the PSU's
+                     *  - Check status, if all is fine progress, or error otherwise
+                     * -# Set the charge_state to bulk
+                     * NOTE no need to break at the end of any of these routines!
+                     **/
+                    if (inputs->voltage >= settings->voltage_float) {
+                        //Batteries are already charged
+                        outputs->charge_state = 4;      //Charging done
+                        break;
+                    }
+                    if (inputs->voltage <= settings->voltage_min) {
+                        //Batteries are not connected or there is  problem
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 1;        //Battery undervolt!
+                        break;
+                    }
+                        //Set PWM to minimum
+                    set_pwm(PWM_CHAN_A,0);
+                    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
+                        //PWM failed to be set so the process is doomed
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 2;        //PWM Set Error
+                        break;
+                    }
+                        //Check PSU states
+                    if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
+                        //One of the PSU's is over temperatur
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 3;        //PSU temperature error
+                        break;
+                    }
+                    if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
+                        //One of the PSU's is over or under voltage
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 4;        //PSU voltage error
+                        break;
+                    }
+                        
+                //Bulk charging
+                case 1:
+                    /**
+                     * @brief Manage the bulk charging, this is constant current (cc) up to a setpoint
+                     * 
+                     * We assume that the PSU's are on and everything is OK
+                     * -# Check voltage
+                     *  - If low progress
+                     *  - If at or above setpoint add to setpoint reached counter
+                     *  - If the setpoint counter is big enough increase charge_state to Rest
+                     * -# Run PID for cc control to setpoint 
+                     * -# check for current and voltage above _threshold
+                     *  - if so apply standard reduction to current control parameter
+                     * -# incriment Ah
+                     **/
+                    
+                //Rest
+                case 2:
+                    /**
+                     * @brief Intiate a rest time based on the Ah into the battery
+                     * 
+                     * We assume that bulk charging is complete
+                     * -# Run once on rest
+                     *  - gracefully reduce PWM
+                     *  - Power down the PSU's (checking they do)
+                     *  - Initialise rest counter (Will be large)
+                     * -# reduce rest counter, possibly every seconds
+                     * -# When rest counter is done progress to Float charge
+                     **/
+                    
+                //Constant voltage
+                case 3:
+                    /** 
+                     * @brief Constant voltage charging
+                     * 
+                     * We assume that bulk and rest charging has been done.
+                     * -# set PWM output low, and go through the same startup sequence as in Bulk
+                     * -# Check current, it must be below current setpoint
+                     *  - What to do if it is not?
+                     * -# Check voltage limits
+                     *  - Do stuff
+                     * -# Run PID on voltage
+                     * -# Check for voltage above voltage_charged
+                     *  - Take action if it is over
+                     * -# @todo: How do we determine when float should finish?
+                     **/
+                // Done
+                case 4:
+                    /**
+                     * @brief the charging is done or has been prematurely stopped.
+                     * 
+                     * We assume nothing except we need charging to stop fairly rapidly
+                     * -# Reduce PWM
+                     * -# Power off PSU's
+                     * -# Reset all counters
+                     * -# Make notes or whatever.
+                     **/
+                    break;
+            }
+    
+    }
 }
 
 /**
@@ -185,12 +333,12 @@ void set_outputs(struct Process* process)
  **/
 void process_control(struct Process *process)
 {
-//     /**make sure only one instance of process_control is running, and is enabled **/
-//     if (process_control_running_flag || !process_control_enable) {
-//         return;
-//     }
-//     // Process_control is running
-//     process_control_running_flag = 1;
+    /**make sure only one instance of process_control is running, and is enabled **/
+    if (process_control_running_flag) {
+        return;
+    }
+    // Process_control is running
+    process_control_running_flag = 1;
     
     /**First things first, lets get the system state **/
     get_state(process);         // That was easy!
@@ -205,5 +353,5 @@ void process_control(struct Process *process)
     set_outputs(process);
     
     //Process_control has finished
-//     process_control_running_flag = 1;
+    process_control_running_flag = 0;
 }

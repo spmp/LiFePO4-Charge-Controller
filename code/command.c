@@ -151,7 +151,7 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
             break;
             
         case 'F': //Filler
-            settings->charged_voltage = commandvalue;
+            settings->voltage_charged = commandvalue;
             break;
 //             
 //         case 'H': //Heater

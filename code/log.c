@@ -32,7 +32,7 @@ void log_to_serial(struct Process *process) {
         send_string_p(PSTR(" v "));
         send_uint16(inputs->voltage);
         send_string_p(PSTR(" SetPoint "));
-        send_uint16(settings->charged_voltage);
+        send_uint16(settings->voltage_charged);
         send_string_p(PSTR(" PID "));
         send_uint16(outputs->Ah_count);
         send_string_p(PSTR(" pwm "));

@@ -29,10 +29,12 @@ struct Inputs {
     uint8_t  BMS_overvolt;      // Signal from the BMS that a battery is overvoltage
     uint8_t  BMS_overtemp;      // Signal from the BMS that a battery is over temperature threshold
     uint16_t battery_temp;      // Temperature of the hottest battery
+//     uint16_t PSU1_current;      // PSU1 current
 //     uint16_t PSU1_temperature;  // PSU1 Temperature
 //     uint16_t PSU1_line_voltage; // PSU1 Line voltage
-//     uint16_t PSU1_temperature;  // PSU1 Temperature
-//     uint16_t PSU1_line_voltage; // PSU1 Line voltage
+//     uint16_t PSU2_current;      // PSU2 current
+//     uint16_t PSU2_temperature;  // PSU2 Temperature
+//     uint16_t PSU2_line_voltage; // PSU2 Line voltage
 //     etc.    
 };
 
@@ -43,19 +45,25 @@ struct Outputs {
     uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
     uint16_t cur_rest_time;     // How long have we been resting?
     uint16_t rest_timer;        // How long do we need to rest for?
-    uint8_t  charge_state;      // State of charging, Bulk, rest, float, Done
+    uint8_t  charge_state;      // State of charging; 0 not charging, 1 Bulk charging, 2 resting, 3 float charging,4 Done (examples), 7 stop - error
+    uint8_t  error_code;        // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
     uint8_t  charge_progress;   // Percentage of charging done.
 };
 
 struct Settings {
-    uint8_t  process_number;    // An index for the process, such that process_control knows with process to run.
+    uint8_t  program_number;    // An index for the process, such that process_control knows with process to run.
     uint16_t current_max;       // Absolute maximum current. Shutdown if over
-    uint16_t charge_current;    // Current to charge the batteries at
+    uint16_t current_threhold;  // Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
+    uint16_t current_charge;    // Current to charge the batteries at
     uint16_t voltage_max;       // Absolute maximum battery voltage. Shutdown if over
-    uint16_t charged_voltage;   // Voltage at which to stop bulk charging
-    uint16_t float_voltage;     // Voltage at which to float the batteries
+    uint16_t voltage_min;       // Minimum battery voltage. Error or batteries disconnected if under.
+    uint16_t voltage_threshold; // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
+    uint16_t voltage_charged;   // Voltage at which to stop bulk charging
+    uint16_t voltage_float;     // Voltage at which to float the batteries
     uint16_t rest_time;         // Time between charged voltage and driving or float/done. This is in seconds per Ah
     uint16_t max_PSU_temp;      // Maximum temperature for any PSU before shutdown
+    uint16_t max_PSU_volt;      // Maximum PSU line voltage
+    uint16_t min_PSU_volt;      // Minimum PSU voltage
     uint16_t max_battery_temp;  // Maximum temperature of any battery before shutdown.
     /** PID **/
     int16_t cc_P_Factor;        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR

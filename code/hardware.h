@@ -86,6 +86,21 @@
 #define VsenseADC       ADC0
 #define VenseADC_REF    VREF_INTERNAL
 
+#define PSU1_ADDRESS    0xA0
+#define PSU2_ADDRESS    0xA1
+
+/**
+ * @struct PSU_state, The state PSU's 1 and 2 from I2C data
+ **/
+struct PSU_state {
+    uint16_t PSU1_current;      // PSU1 current
+    uint16_t PSU1_temperature;  // PSU1 Temperature
+    uint16_t PSU1_line_voltage; // PSU1 Line voltage
+    uint16_t PSU2_current;      // PSU2 current
+    uint16_t PSU2_temperature;  // PSU2 Temperature
+    uint16_t PSU2_line_voltage; // PSU2 Line voltage
+};
+
 /**
  * @brief Initialise hardware 
  * 
@@ -117,7 +132,7 @@ uint16_t get_current( void );
  * @brief Get the state of charge of the batteries
  * 
  * Gets the state of charge in Ah or percentage*100
- * @var type, see defines
+ * @param type, see defines
  * @return uint16, the state of charge
  **/
 uint16_t get_SoC( uint8_t op_type );
@@ -125,8 +140,36 @@ uint16_t get_SoC( uint8_t op_type );
 /**
  * @brief Get the PWM duty cycle
  * 
- * @var channel, PWM channel, see defines 
- * @var type, see defines
+ * @param channel, PWM channel, see defines 
+ * @param type, see defines
  * @return uint16, the pwm duty cycle
  **/
 uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type );
+
+/**
+ * @brief Get the state of the PSUs via I2C
+ * 
+ * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
+ **/
+void get_psu_state(struct PSU_state *psu_struct);
+
+/**
+ * @brief Get PSU's current
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct);
+
+/**
+ * @brief Get PSU's voltage
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct);
+
+/**
+ * @brief Get PSU's temperature
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ **/
+uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct);
