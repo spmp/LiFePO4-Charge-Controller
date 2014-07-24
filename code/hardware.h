@@ -96,9 +96,11 @@ struct PSU_state {
     uint16_t PSU1_current;      // PSU1 current
     uint16_t PSU1_temperature;  // PSU1 Temperature
     uint16_t PSU1_line_voltage; // PSU1 Line voltage
+    uint8_t  PSU1_PSON_state;   // PSU1 power status
     uint16_t PSU2_current;      // PSU2 current
     uint16_t PSU2_temperature;  // PSU2 Temperature
     uint16_t PSU2_line_voltage; // PSU2 Line voltage
+    uint8_t  PSU2_PSON_state;   // PSU2 power status
 };
 
 /**
@@ -157,6 +159,8 @@ void get_psu_state(struct PSU_state *psu_struct);
  * @brief Get PSU's current
  * 
  * @param psu_number, the number 1 or 2 of the PSU
+ * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
+ * @return uint16 the current flowing through of a PSU
  **/
 uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct);
 
@@ -164,6 +168,8 @@ uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct);
  * @brief Get PSU's voltage
  * 
  * @param psu_number, the number 1 or 2 of the PSU
+ * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
+ * @return uint16 the line voltage of a PSU
  **/
 uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct);
 
@@ -171,5 +177,23 @@ uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct)
  * @brief Get PSU's temperature
  * 
  * @param psu_number, the number 1 or 2 of the PSU
+ * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
+ * @return uint16 the temperature of a PSU
  **/
 uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct);
+
+/**
+ * @brief Power on or off a PSU
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ * @param state, 0 turn off, 1 turn on, other turn off
+ **/
+void psu_power(uint8_t psu_number, uint8_t state);
+
+/**
+ * @brief Check the power state of a PSU in realtime.
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ * @param state, 0 turn off, 1 turn on, other turn off
+ **/
+uint8_t psu_power_check(uint8_t psu_number);

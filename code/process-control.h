@@ -13,9 +13,10 @@
  *****************************************************************************/
 #pragma once
 #include <avr/io.h>
+#include <avr/sleep.h>
+#include <util/delay.h>
 #include "hardware.h"
 #include "AVR-lib/lib/pid.h"
-#include <avr/io.h>
 #include "AVR-lib/usart.h"
 #include "AVR-lib/clock.h"
 

@@ -200,6 +200,20 @@ void calculate_outputs(struct Process* process)
                         outputs->error_code = 4;        //PSU voltage error
                         break;
                     }
+                    //Turn on the PSU's
+                    psu_power(1,1);
+                    psu_power(2,1);
+                    _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
+                    if (!psu_power_check(1) || !psu_power_check(2)) {
+                        //Something went wrong! PSU's have not powered on
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 5;        //PSU PSON error
+                        break;
+                    }
+                    
+                        // OK, its all done, we can progress!
+                    outputs->charge_state = 2;
+
                         
                 //Bulk charging
                 case 1:

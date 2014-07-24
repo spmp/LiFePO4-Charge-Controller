@@ -163,3 +163,52 @@ uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct)
         return  psu_struct->PSU1_temperature;
     }
 }
+
+
+/**
+ * @brief Power on or off a PSU
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ * @param state, 0 turn off, 1 turn on, other turn off
+ **/
+void psu_power(uint8_t psu_number, uint8_t state)
+{
+    //Send the I2R command to turn the PSU on
+    if (psu_number == 1 ) {
+        if (state == 1) {
+            //turn on
+        }
+        else {
+            //turn off
+        }
+    }
+    //Send the I2R command to turn the PSU on
+    if (psu_number == 2 ) {
+        if (state == 1) {
+            //turn on
+        }
+        else {
+            //turn off
+        }
+    }
+}
+
+/**
+ * @brief Check the power state of a PSU in realtime.
+ * 
+ * @param psu_number, the number 1 or 2 of the PSU
+ * @param state, 0 turn off, 1 turn on, other turn off
+ **/
+uint8_t psu_power_check(uint8_t psu_number)
+{
+    //Send the I2R command to check psu state
+    if (psu_number == 1 ) {
+        //check state
+        return 0;
+    }
+    //Send the I2R command to turn the PSU on
+    if (psu_number == 2 ) {
+        //check state
+        return 0;
+    }
+}
