@@ -37,9 +37,12 @@ uint8_t process_control_enable = 1;               //enabled by default
  * @var
  * @def SETPOINT_REACHED_COUNT
  * How many counts of setpoint_reached_counter to count for
+ * @def PWM_THRESHOLD_REDUCTION
+ * How much to reduce the PWM by if we enounter an over threshold
  **/
 #define SETPOINT_REACHED_COUNT      100
 uint8_t setpoint_reached_counter=0;
+#define PWM_THRESHOLD_REDUCTION     1000
 
 /** @brief struct(s) for PID **/
 struct u_PID_DATA pidData_cc;    // PID data for constant current
@@ -135,8 +138,8 @@ void calculate_outputs(struct Process* process)
     struct Outputs *outputs = &process->outputs;
     struct Settings *settings = &process->settings;
     
-    outputs->Ah_count = u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
-    outputs->pwm_duty += (int32_t)(outputs->Ah_count/8);
+//     outputs->Ah_count = u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
+//     outputs->pwm_duty += (int32_t)(outputs->Ah_count/8);
     
     /** The actual process control is as follows: **/
     
@@ -230,6 +233,35 @@ void calculate_outputs(struct Process* process)
                      *  - if so apply standard reduction to current control parameter
                      * -# incriment Ah
                      **/
+                    // Check voltages
+                    if (inputs->voltage >= settings->voltage_charged){
+                        setpoint_reached_counter++;
+                        // Has charging really finished?
+                        if (setpoint_reached_counter >= SETPOINT_REACHED_COUNT ) {
+                            // OMG we are done bulk charging
+                            outputs->charge_state = 2;
+                        }
+                    }
+                    
+                    /** 
+                     * @brief This is where most of the MAGIC happens, and where things can go horrible wrong!
+                     * 
+                     * PID PID PID PID
+                     * Personally I think that we CANNOT use the I term due to the cumulative error as the chargers are below the battery voltage
+                     *  Divisors, gain terms, oscillation!
+                     * 
+                     * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
+                     **/
+                    outputs->pwm_duty += u_pid_Controller(settings->current_charge, inputs->current, &pidData_cc)/4;
+                    
+                    // Check if over _thresholds
+                    if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
+                        //OMG reduce the PWM!
+                        outputs->pwm_duty -= PWM_THRESHOLD_REDUCTION;
+                    }
+                    
+                    // Incdriment Ah
+                    outputs->Ah_count += inputs->current;
                     
                 //Rest
                 case 2:
