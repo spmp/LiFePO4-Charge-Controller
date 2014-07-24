@@ -36,6 +36,8 @@ uint8_t process_control_enable = 1;               //enabled by default
  * How long have we been resting for. May be redundant if we decriment rest timer.
  * @var rest_init_flag
  * Allow us to run some stuff on the first rest
+ * @var done_init_flag
+ * Same as above
  * @def SETPOINT_REACHED_COUNT
  * How many counts of setpoint_reached_counter to count for
  * @def PWM_THRESHOLD_REDUCTION
@@ -46,6 +48,7 @@ uint8_t process_control_enable = 1;               //enabled by default
 #define PWM_THRESHOLD_REDUCTION     1000
 uint8_t setpoint_reached_counter = 0;
 uint8_t rest_init_flag = 0;
+uint8_t done_init_flag = 0;
 
 /** @brief struct(s) for PID **/
 struct u_PID_DATA pidData_cc;    // PID data for constant current
@@ -174,15 +177,46 @@ void calculate_outputs(struct Process* process)
                      * -# Set the charge_state to bulk
                      * NOTE no need to break at the end of any of these routines!
                      **/
-                    // Check that we are not already connected to charged batteries
                     if (inputs->voltage >= settings->voltage_float) {
                         //Batteries are already charged
                         outputs->charge_state = 4;      //Charging done
                         break;
                     }
-                    // Turn on the Power supllies
-                    if (turn_on_PSUs()) {
-                        //Some shit went wrong turning on the power supplies! Flags are flying and errors already reported
+                    if (inputs->voltage <= settings->voltage_min) {
+                        //Batteries are not connected or there is  problem
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 1;        //Battery undervolt!
+                        break;
+                    }
+                        //Set PWM to minimum
+                    set_pwm(PWM_CHAN_A,0);
+                    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
+                        //PWM failed to be set so the process is doomed
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 2;        //PWM Set Error
+                        break;
+                    }
+                        //Check PSU states
+                    if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
+                        //One of the PSU's is over temperatur
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 3;        //PSU temperature error
+                        break;
+                    }
+                    if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
+                        //One of the PSU's is over or under voltage
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 4;        //PSU voltage error
+                        break;
+                    }
+                    //Turn on the PSU's
+                    psu_power(1,1);
+                    psu_power(2,1);
+                    _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
+                    if (!psu_power_check(1) || !psu_power_check(2)) {
+                        //Something went wrong! PSU's have not powered on
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 5;        //PSU PSON error
                         break;
                     }
                     
@@ -248,8 +282,36 @@ void calculate_outputs(struct Process* process)
                      * -# reduce rest counter, possibly every seconds
                      * -# When rest counter is done progress to Float charge
                      **/
+                    // Do stuff on the first running
+                    if (!rest_init_flag) {
+                        //Power down the PSU's
+                        outputs->pwm_duty = 0;
+                        psu_power(1,0);
+                        psu_power(2,0);
+                        
+                        /**
+                         * @brief  Calculate rest time in _medium_ time periods of a seconds
+                         *  Batteries specified as 1 hour per 100Ah.
+                         * Which is 1*(60*60/100) = 36 seconds per Ah.
+                         * Which is 180 _medium_ timesteps per Ah.
+                         * Now we are storing Ah as Amps . 1/5th of a second
+                         * So want seconds so we need to divide Ah by 180
+                         *  MY MATH IS ALL WRONG!
+                         **/
+                        outputs->rest_timer = outputs->Ah_count / settings->rest_time ;
+                        
+                        //Set the rest_init_flag so we dont do this again
+                        rest_init_flag = 1;
+                    }
                     
+                    //Decriment the rest timer
+                    outputs->rest_timer --;
                     
+                    if (!outputs->rest_timer) {
+                        //Done resting
+                        outputs->charge_state = 3;
+                    }
+                        
                 //Constant voltage
                 case 3:
                     /** 
@@ -266,6 +328,61 @@ void calculate_outputs(struct Process* process)
                      *  - Take action if it is over
                      * -# @todo: How do we determine when float should finish?
                      **/
+                        //Set PWM to minimum
+                    set_pwm(PWM_CHAN_A,0);
+                    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
+                        //PWM failed to be set so the process is doomed
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 2;        //PWM Set Error
+                        break;
+                    }
+                        //Check PSU states
+                    if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
+                        //One of the PSU's is over temperatur
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 3;        //PSU temperature error
+                        break;
+                    }
+                    if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
+                        //One of the PSU's is over or under voltage
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 4;        //PSU voltage error
+                        break;
+                    }
+                    //Turn on the PSU's
+                    psu_power(1,1);
+                    psu_power(2,1);
+                    _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
+                    if (!psu_power_check(1) || !psu_power_check(2)) {
+                        //Something went wrong! PSU's have not powered on
+                        outputs->charge_state = 7;      //Charging error
+                        outputs->error_code = 5;        //PSU PSON error
+                        break;
+                    }
+                    
+                    //All good, now we can do Float charging for... ever...
+                    
+                    /** 
+                     * @brief This is where most of the MAGIC happens, and where things can go horrible wrong!
+                     * 
+                     * PID PID PID PID
+                     * Personally I think that we CANNOT use the I term due to the cumulative error as the chargers are below the battery voltage
+                     *  Divisors, gain terms, oscillation!
+                     * 
+                     * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
+                     **/
+                    outputs->pwm_duty += u_pid_Controller(settings->voltage_float, inputs->voltage, &pidData_cv)/4;
+                    
+                    // Check if over _thresholds
+                    if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
+                        //OMG reduce the PWM!
+                        outputs->pwm_duty -= PWM_THRESHOLD_REDUCTION;
+                    }
+                    
+                    // Incdriment Ah
+                    outputs->Ah_count += inputs->current;
+                    
+                    
                 // Done
                 case 4:
                     /**
@@ -274,9 +391,20 @@ void calculate_outputs(struct Process* process)
                      * We assume nothing except we need charging to stop fairly rapidly
                      * -# Reduce PWM
                      * -# Power off PSU's
-                     * -# Reset all counters
-                     * -# Make notes or whatever.
+                     * -# Reset all counters - NO we will do that on start!
+                     * -# Make notes or whatever. - Whatever!
                      **/
+                    // Do stuff on the first running
+                    if (!done_init_flag) {
+                        //Power down the PSU's
+                        outputs->pwm_duty = 0;
+                        psu_power(1,0);
+                        psu_power(2,0);
+                    
+                        //We are done, just uselessly loop through from now on
+                        done_init_flag = 1;
+                    }
+                    
                     break;
             }
     
@@ -373,58 +501,4 @@ void process_control(struct Process *process)
     
     //Process_control has finished
     process_control_running_flag = 0;
-}
-
-/**
- * @brief Gravefully turn on the Power Supplies
- * 
- * @retval 0, Everything went well
- * @retval 1, OH dear, there was some error!
- **/
-uint8_t turn_on_PSUs(struct Process *process )
-{
-    struct Inputs *inputs = &process->inputs;
-    struct Outputs *outputs = &process->outputs;
-    
-        //Check that we are connected to the batteries
-    if (inputs->voltage <= settings->voltage_min) {
-        //Batteries are not connected or there is  problem
-        outputs->charge_state = 7;      //Charging error
-        outputs->error_code = 1;        //Battery undervolt!
-        return 1;
-    }
-        //Set PWM to minimum
-    set_pwm(PWM_CHAN_A,0);
-    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
-        //PWM failed to be set so the process is doomed
-        outputs->charge_state = 7;      //Charging error
-        outputs->error_code = 2;        //PWM Set Error
-        return 1;
-    }
-        //Check PSU states
-    if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
-        //One of the PSU's is over temperatur
-        outputs->charge_state = 7;      //Charging error
-        outputs->error_code = 3;        //PSU temperature error
-        return 1;
-    }
-    if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
-        //One of the PSU's is over or under voltage
-        outputs->charge_state = 7;      //Charging error
-        outputs->error_code = 4;        //PSU voltage error
-        return 1;
-    }
-    //Turn on the PSU's
-    psu_power(1,1);
-    psu_power(2,1);
-    _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
-    if (!psu_power_check(1) || !psu_power_check(2)) {
-        //Something went wrong! PSU's have not powered on
-        outputs->charge_state = 7;      //Charging error
-        outputs->error_code = 5;        //PSU PSON error
-        return 1;
-    }
-    
-    // Everything is A-OK
-    return 0;
 }

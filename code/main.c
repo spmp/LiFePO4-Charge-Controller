@@ -24,8 +24,8 @@ void once_per_second() {
     PORTB ^= (1 << PORTB5); //Toggle LED
 }
 
-#undef MEDIUM_TIME_INTERVAL
-#define MEDIUM_TIME_INTERVAL 15
+// #undef MEDIUM_TIME_INTERVAL
+// #define MEDIUM_TIME_INTERVAL 15
 void medium_timestep() {
 //     send_log = 1;
     begin_process_control_flag = 1;

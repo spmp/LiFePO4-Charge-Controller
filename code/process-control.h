@@ -135,3 +135,12 @@ void set_outputs(struct Process *process);
  * @param *process, a struct of type Process in which to save the system state
  **/
 void process_control(struct Process *process);
+
+
+/**
+ * @brief Gravefully turn on the Power Supplies
+ * 
+ * @retval 0, Everything went well
+ * @retval 1, OH dear, there was some error!
+ **/
+// uint8_t turn_on_PSUs(struct Process *process )
