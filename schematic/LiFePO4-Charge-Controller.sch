@@ -675,7 +675,7 @@ Wire Wire Line
 Wire Wire Line
 	1500 5350 1400 5350
 Wire Wire Line
-	1400 5550 1500 5550
+	1300 5550 1500 5550
 Wire Wire Line
 	2050 4100 1900 4100
 Wire Wire Line
@@ -683,7 +683,7 @@ Wire Wire Line
 Wire Wire Line
 	1500 3900 1400 3900
 Wire Wire Line
-	1400 4100 1500 4100
+	1300 4100 1500 4100
 Wire Wire Line
 	1300 5200 2100 5200
 Wire Wire Line
@@ -980,4 +980,14 @@ Wire Wire Line
 	7650 2800 7650 3550
 Connection ~ 7650 3550
 Connection ~ 7650 2900
+Connection ~ 1400 4100
+Connection ~ 1400 5550
+Wire Wire Line
+	8850 4250 8850 4400
+Text GLabel 1300 4100 0    60   Input ~ 0
+I2C1_GND
+Text GLabel 1300 5550 0    60   Input ~ 0
+I2C2_GND
+Text GLabel 8850 4400 3    60   Input ~ 0
+RS232_GND
 $EndSCHEMATC
