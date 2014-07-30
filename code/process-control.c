@@ -42,10 +42,12 @@ uint8_t process_control_enable = 1;               //enabled by default
  * How many counts of setpoint_reached_counter to count for
  * @def PWM_THRESHOLD_REDUCTION
  * How much to reduce the PWM by if we enounter an over threshold
- * 
+ * @def PWM_START
+ * Which value to start the PWM at on powerup from cold 
  **/
 #define SETPOINT_REACHED_COUNT      100
 #define PWM_THRESHOLD_REDUCTION     1000
+#define PWM_START                   65535
 uint8_t setpoint_reached_counter = 0;
 uint8_t rest_init_flag = 0;
 uint8_t done_init_flag = 0;
@@ -62,7 +64,7 @@ struct PSU_state psu_state = {0};
 struct Process process = {
     {0},
     {
-    .pwm_duty = 10,          // Duty cycle of pwm_duty
+    .pwm_duty = PWM_START,          // Duty cycle of pwm_duty
     .PSU_state = 20,         // State of the PSU's
     .Ah_count = 30,          // How many Ah's have passed through the charger in this cycle
     .charge_timer = 40,      // How long have we been in the 'bulk' charging phase
@@ -189,8 +191,8 @@ void calculate_outputs(struct Process* process)
                         break;
                     }
                         //Set PWM to minimum
-                    set_pwm(PWM_CHAN_A,0);
-                    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
+                    set_pwm(PWM_CHAN_A, PWM_START);
+                    if (get_pwm_duty(PWM_CHAN_A,ABSOLUTE) != PWM_START) {
                         //PWM failed to be set so the process is doomed
                         outputs->charge_state = 7;      //Charging error
                         outputs->error_code = 2;        //PWM Set Error
@@ -258,12 +260,12 @@ void calculate_outputs(struct Process* process)
                      * 
                      * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
                      **/
-                    outputs->pwm_duty += u_pid_Controller(settings->current_charge, inputs->current, &pidData_cc)/4;
+                    outputs->pwm_duty -= u_pid_Controller(settings->current_charge, inputs->current, &pidData_cc)/4;
                     
                     // Check if over _thresholds
                     if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
                         //OMG reduce the PWM!
-                        outputs->pwm_duty -= PWM_THRESHOLD_REDUCTION;
+                        outputs->pwm_duty += PWM_THRESHOLD_REDUCTION;
                     }
                     
                     // Incdriment Ah
@@ -285,7 +287,7 @@ void calculate_outputs(struct Process* process)
                     // Do stuff on the first running
                     if (!rest_init_flag) {
                         //Power down the PSU's
-                        outputs->pwm_duty = 0;
+                        outputs->pwm_duty = PWM_START;
                         psu_power(1,0);
                         psu_power(2,0);
                         
@@ -329,8 +331,8 @@ void calculate_outputs(struct Process* process)
                      * -# @todo: How do we determine when float should finish?
                      **/
                         //Set PWM to minimum
-                    set_pwm(PWM_CHAN_A,0);
-                    if (!get_pwm_duty(PWM_CHAN_A,ABSOLUTE)) {
+                    set_pwm(PWM_CHAN_A,PWM_START);
+                    if (get_pwm_duty(PWM_CHAN_A,ABSOLUTE) != PWM_START) {
                         //PWM failed to be set so the process is doomed
                         outputs->charge_state = 7;      //Charging error
                         outputs->error_code = 2;        //PWM Set Error
@@ -371,12 +373,12 @@ void calculate_outputs(struct Process* process)
                      * 
                      * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
                      **/
-                    outputs->pwm_duty += u_pid_Controller(settings->voltage_float, inputs->voltage, &pidData_cv)/4;
+                    outputs->pwm_duty -= u_pid_Controller(settings->voltage_float, inputs->voltage, &pidData_cv)/4;
                     
                     // Check if over _thresholds
                     if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
                         //OMG reduce the PWM!
-                        outputs->pwm_duty -= PWM_THRESHOLD_REDUCTION;
+                        outputs->pwm_duty += PWM_THRESHOLD_REDUCTION;
                     }
                     
                     // Incdriment Ah
@@ -397,7 +399,7 @@ void calculate_outputs(struct Process* process)
                     // Do stuff on the first running
                     if (!done_init_flag) {
                         //Power down the PSU's
-                        outputs->pwm_duty = 0;
+                        outputs->pwm_duty = PWM_START;
                         psu_power(1,0);
                         psu_power(2,0);
                     

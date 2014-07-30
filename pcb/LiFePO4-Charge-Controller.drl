@@ -1,5 +1,5 @@
 M48
-;DRILL file {Pcbnew (22-Jun-2014 BZR 4027)-stable} date Wed 30 Jul 2014 01:02:55 NZST
+;DRILL file {Pcbnew (22-Jun-2014 BZR 4027)-stable} date Wed 30 Jul 2014 13:10:02 NZST
 ;FORMAT={-:-/ absolute / inch / decimal}
 FMAT,2
 INCH,TZ
@@ -12,7 +12,7 @@ G90
 G05
 M72
 T1
-X7.875Y-6.1
+X7.8366Y-6.065
 T2
 X7.875Y-4.475
 X7.875Y-4.775

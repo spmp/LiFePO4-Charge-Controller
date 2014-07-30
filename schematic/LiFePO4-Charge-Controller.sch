@@ -37,7 +37,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
 Title ""
-Date "29 jul 2014"
+Date "30 jul 2014"
 Rev ""
 Comp ""
 Comment1 ""
@@ -990,4 +990,5 @@ Text GLabel 1300 5550 0    60   Input ~ 0
 I2C2_GND
 Text GLabel 8850 4400 3    60   Input ~ 0
 RS232_GND
+Connection ~ 4000 1550
 $EndSCHEMATC

@@ -1,4 +1,4 @@
-Cmp-Mod V01 Created by CvPcb (22-Jun-2014 BZR 4027)-stable date = Tue 29 Jul 2014 18:23:42 NZST
+Cmp-Mod V01 Created by CvPcb (22-Jun-2014 BZR 4027)-stable date = Wed 30 Jul 2014 12:35:57 NZST
 
 BeginCmp
 TimeStamp = /53D227F6;
@@ -340,7 +340,7 @@ BeginCmp
 TimeStamp = /53D25D9A;
 Reference = UINA1;
 ValeurCmp = AD8236;
-IdModule  = SO8E;
+IdModule  = MSOP_8;
 EndCmp
 
 BeginCmp
