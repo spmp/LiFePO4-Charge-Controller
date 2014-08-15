@@ -37,7 +37,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
 Title ""
-Date "30 jul 2014"
+Date "9 aug 2014"
 Rev ""
 Comp ""
 Comment1 ""
@@ -991,4 +991,21 @@ I2C2_GND
 Text GLabel 8850 4400 3    60   Input ~ 0
 RS232_GND
 Connection ~ 4000 1550
+$Comp
+L DIODESCH D1
+U 1 1 53E68BE4
+P 4750 2450
+F 0 "D1" H 4750 2550 40  0000 C CNN
+F 1 "DIODESCH" H 4750 2350 40  0000 C CNN
+F 2 "~" H 4750 2450 60  0000 C CNN
+F 3 "~" H 4750 2450 60  0000 C CNN
+	1    4750 2450
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	4950 2450 5000 2450
+Connection ~ 5000 2450
+Wire Wire Line
+	4550 2450 4500 2450
+Connection ~ 4500 2450
 $EndSCHEMATC
