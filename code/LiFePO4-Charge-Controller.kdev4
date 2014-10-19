@@ -1,3 +1,3 @@
 [Project]
-Manager=KDevCustomMakeManager
-Name=LiFePO4-Charge-Controller
+Manager=KDevGenericManager
+Name=code
