@@ -13,7 +13,7 @@
  *****************************************************************************/
 #include "log.h"
 #include "process-control.h"
-#include "AVR-lib/lib/pid.h"
+#include "pid.h"
 
 uint8_t logenable = LOG_ENABLE; //logging enabled/disabled at startup
 
@@ -29,18 +29,33 @@ void log_to_serial(struct Process *process) {
         send_uint32_half(timestamp & 0xFFFFFFFF);
         send_string_p(PSTR(" c "));
         send_uint16(inputs->current);
+//         send_uint16(inputs->PSU1AnalogData.Current);
+//         send_string_p(PSTR(" c1 "));
+//         send_uint16(inputs->PSU2AnalogData.Current);
         send_string_p(PSTR(" v "));
         send_uint16(inputs->voltage);
         send_string_p(PSTR(" Progress "));
         send_uint16(get_SoC(PERCENT));
-        send_string_p(PSTR(" Ah* "));
+        send_string_p(PSTR(" Ahx100 "));
         send_uint16(outputs->Ah_count);
         send_string_p(PSTR(" Charge state "));
         send_uint16(outputs->charge_state);
         send_string_p(PSTR(" pwm "));
         send_uint16(outputs->pwm_duty);
-        send_string_p(PSTR(" SetPoint "));
+        send_string_p(PSTR(" Vsp "));
         send_uint16(settings->voltage_charged);
+        send_string_p(PSTR(" Csp "));
+        send_uint16(settings->current_charge);
+        send_string_p(PSTR(" PiD "));
+        if (settings->PIDoutput < 0){
+            send_string_p(PSTR("-"));
+            send_uint16(-(settings->PIDoutput));
+        }
+        else {
+            send_uint16(settings->PIDoutput);
+        }
+            
+            
 //         send_string_p(PSTR(" P "));
 //         send_uint16(pidData_cv.P_Factor);
 //         send_string_p(PSTR(" I "));

@@ -25,10 +25,43 @@
  * One call to rule them all
  */
 void init_hardware(void ) {
+    wd_reset();
+    WD_SET(WD_OFF);
     init_clock();
+    init_io_ports();
     init_usart(USART_BAUDE, F_CPU);
     i2c_init(I2C_FREQ,F_CPU);
     init_pwm(PWM_TOP, 1);
+    set_pwm(1,PWM_START);
+    WD_SET(WD_RST,WDTO_4S);
+    //Set B1 as output
+//     DDRB |= (1 << PIN1);
+}
+
+/**
+ * @brief Initialise I/O ports
+ * 
+ * Initialise PIN I/O states that do not fall into the PWM, I2C/TWi etc categories
+ */
+void init_io_ports(void ) {
+
+    //Set Internal LED pin to output
+    DDRB |= (1 << ONBOARD_LED);
+    //Set Green LED pin to output
+    DDRB |= (1 << GREEN_LED);
+    //Set Red LED pin to output
+    DDRB |= (1 << RED_LED);
+    
+    //Set PSU1_ON pin to output
+    DDRD |= (1 << PSU1_ON);
+    //Set PSU2_ON pin to output
+    DDRD |= (1 << PSU2_ON);
+    
+    //Set outputs OFF
+    PORTD &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
+    //Set Green LED ON
+    PORTB |= (1 << GREEN_LED);
+
 }
 
 /**
@@ -43,7 +76,7 @@ void init_hardware(void ) {
 uint16_t get_voltage( void )
 {
 //     return read_ADC_pin_millivolts(0, VREF_INTERNAL);
-    return read_ADC_pin_millivolts(0, VREF_VCC);
+    return read_ADC_pin_millivolts(0, VenseADC_REF);
 }
 
 /**
@@ -108,15 +141,13 @@ uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type )
  * 
  * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
  **/
-void get_psu_state(struct PSU_state *psu_struct)
+void get_psu_state(struct Inputs *ProcessControlInputs)
 {
-    // USE I2C reads to get the states
-    psu_struct->PSU1_current = 10;      // PSU1 current
-    psu_struct->PSU1_temperature = 20;  // PSU1 Temperature
-    psu_struct->PSU1_line_voltage= 240; // PSU1 Line voltage
-    psu_struct->PSU2_current = 11;      // PSU2 current
-    psu_struct->PSU2_temperature = 30;  // PSU2 Temperature
-    psu_struct->PSU2_line_voltage = 240; // PSU2 Line voltage
+    //TODO: PSU State
+    esp120_analog_data(PSU1_ADDRESS, &ProcessControlInputs->PSU1AnalogData);
+//     *ProcessControlInputs->PSU1StatusReg = esp120_get_status_register(PSU1_ADDRESS);
+//     esp120_analog_data(PSU2_ADDRESS, &ProcessControlInputs->PSU2AnalogData);
+//     *ProcessControlInputs->PSU2StatusReg = esp120_get_status_register(PSU2_ADDRESS);
 }
 
 /**
@@ -168,7 +199,7 @@ uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct)
 /**
  * @brief Power on or off a PSU
  * 
- * @param psu_number, the number 1 or 2 of the PSU
+ * @param psu_number, the number 1 or 2 of the PSU. Anything else (0,3,4..) does both
  * @param state, 0 turn off, 1 turn on, other turn off
  **/
 void psu_power(uint8_t psu_number, uint8_t state)
@@ -177,18 +208,32 @@ void psu_power(uint8_t psu_number, uint8_t state)
     if (psu_number == 1 ) {
         if (state == 1) {
             //turn on
+            PSU_ON_PORT |= (1 << PSU1_ON);
         }
         else {
             //turn off
+            PSU_ON_PORT &= ~(1 << PSU1_ON);
         }
     }
     //Send the I2R command to turn the PSU on
-    if (psu_number == 2 ) {
+    else if (psu_number == 2 ) {
         if (state == 1) {
             //turn on
+            PSU_ON_PORT |= (1 << PSU2_ON);
         }
         else {
             //turn off
+            PSU_ON_PORT &= ~(1 << PSU2_ON);
+        }
+    }
+    else {
+        if (state == 1 ){
+            //turn on both PSU's
+            PSU_ON_PORT |= ((1 << PSU1_ON) | (1 << PSU2_ON));
+        }
+        else {
+            //turn off both PSU's
+            PSU_ON_PORT &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
         }
     }
 }

@@ -13,12 +13,12 @@
  *****************************************************************************/
 #pragma once
 #include <avr/io.h>
-#include "AVR-lib/usart.h"
-#include "AVR-lib/clock.h"
+#include "usart.h"
+#include "clock.h"
 #include "process-control.h"
 
 #ifndef LOG_ENABLE
-#define LOG_ENABLE 1 //1 log enabled, 0 log disabled
+#define LOG_ENABLE 0 //1 log enabled, 0 log disabled
 #endif
 
 /* Logging bit */

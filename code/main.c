@@ -4,9 +4,24 @@
 #include <util/delay.h>
 
 #include "hardware.h"
+#include "wd.h"
 #include "process-control.h"
 #include "command.h"
 #include "log.h"
+#include "usart.h"
+
+// Watchdog and reset state.
+// "You're not suppose to call get_mcusr() in main().
+// "the attribute section(".init3") puts the code in before main() so it runs automatically before entering main().
+// NOTE: This code will work with a recent version of 'optiboot' as the bootloader:
+uint8_t resetFlags __attribute__ ((section(".noinit")));
+void resetFlagsInit(void) __attribute__ ((naked)) __attribute__ ((section (".init0")));
+void resetFlagsInit(void)
+{
+  // save the reset flags passed from the bootloader
+  __asm__ __volatile__ ("mov %0, r2\n" : "=r" (resetFlags) :);
+}
+
 
 /**
  * @var send_log, whether to log to USART or not
@@ -22,6 +37,8 @@ uint8_t send_log = 0;
 void once_per_second() {
     send_log = 1;
     PORTB ^= (1 << PORTB5); //Toggle LED
+    PORTB ^= (1 << GREEN_LED); //Toggle Green LED
+    PORTB ^= (1 << RED_LED); //Toggle Red LED
 }
 
 // #undef MEDIUM_TIME_INTERVAL
@@ -41,6 +58,13 @@ int main() {
     set_sleep_mode(SLEEP_MODE_IDLE);
     init_hardware();
     init_PID(&process);
+    sei();
+    
+    //Send initialisation message:
+    // TODO: This will show how many resets... after the R
+    send_string_p(PSTR("Rx LiFePO4 Charge Controller for ESP-120 PSU's. V:0.2.0. Jasper Aorangi 2014. Have a nice day 8): "));
+    send_uint16(resetFlags);
+    send_string_p(PSTR(" x\r\n"));
     
     //Set timer callbacks
     clock_set_seconds_callback(&once_per_second);
@@ -50,7 +74,16 @@ int main() {
     //USART line handler
     usart_set_handle_char_string_from_serial(&handle_line);
     
-    sei();
+    
+    //Pre Process Control Wait and checks -- Cannot wait more than Watchdog reset
+    uint8_t i;
+    for (i=0; i <= PSU_WAIT_ON; i++)
+    {
+        _delay_ms(1000);             //Wait for PSU to be ready NOTE:WE Want this happening IN whilst process control can check stuff!!!
+        wd_reset();
+    }
+    process_control_enable();           //Enable Process Control
+    PIDtype = 1;                        //Enable temporary current control programme.
     
     for (;;) {
         sleep_mode(); // blocked until after an interrupt has fired
@@ -71,6 +104,7 @@ int main() {
             send_log = 0;
             log_to_serial(&process);
         }
+        wd_reset();
     }
 
     return 0;

@@ -16,9 +16,13 @@
 #include <avr/sleep.h>
 #include <util/delay.h>
 #include "hardware.h"
-#include "AVR-lib/lib/pid.h"
-#include "AVR-lib/usart.h"
-#include "AVR-lib/clock.h"
+#include "pid.h"
+#include "usart.h"
+#include "clock.h"
+#include "esp120.h"
+
+extern uint8_t PIDtype;
+extern uint16_t cPIDmaxread;
 
 extern uint8_t begin_process_control_flag;
 extern uint8_t process_control_running_flag;
@@ -30,19 +34,16 @@ struct Inputs {
     uint8_t  BMS_overvolt;      // Signal from the BMS that a battery is overvoltage
     uint8_t  BMS_overtemp;      // Signal from the BMS that a battery is over temperature threshold
     uint16_t battery_temp;      // Temperature of the hottest battery
-//     uint16_t PSU1_current;      // PSU1 current
-//     uint16_t PSU1_temperature;  // PSU1 Temperature
-//     uint16_t PSU1_line_voltage; // PSU1 Line voltage
-//     uint16_t PSU2_current;      // PSU2 current
-//     uint16_t PSU2_temperature;  // PSU2 Temperature
-//     uint16_t PSU2_line_voltage; // PSU2 Line voltage
-//     etc.    
+    struct ESP120AnalogData PSU1AnalogData;
+    uint8_t PSU1StatusReg;      // PSU1 Status Register
+    struct ESP120AnalogData PSU2AnalogData;
+    uint8_t PSU2StatusReg;      // PSU2 Status Register
 };
 
 struct Outputs {
-    uint16_t pwm_duty;          // Duty cycle of pwm_duty
+    int16_t pwm_duty;          // Duty cycle of pwm_duty
     uint8_t  PSU_state;         // State of the PSU's
-    int32_t Ah_count;          // How many Ah's have passed through the charger in this cycle
+    uint16_t Ah_count;          // How many Ah's have passed through the charger in this cycle. (Ahx100)
     uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
     uint16_t cur_rest_time;     // How long have we been resting?
     uint16_t rest_timer;        // How long do we need to rest for?
@@ -67,6 +68,7 @@ struct Settings {
     uint16_t min_PSU_volt;      // Minimum PSU voltage
     uint16_t max_battery_temp;  // Maximum temperature of any battery before shutdown.
     /** PID **/
+    int16_t PIDoutput;          // Output from the PID algorythm
     int16_t cc_P_Factor;        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR
     int16_t cc_I_Factor;        //! The cc Integral tuning constant, multiplied with SCALING_FACTOR
     int16_t cc_D_Factor;        //! The cc Derivative tuning constant, multiplied with SCALING_FACTOR
@@ -117,6 +119,17 @@ void check_limits(struct Process *process);
  * @param *process, a struct of type Process in which to save the system state
  **/
 void set_outputs(struct Process *process);
+
+
+/**
+ * @brief Enable process control
+ **/
+void process_control_enable( void );
+
+/**
+ * @brief Disable process control
+ **/
+void process_control_disable(void);
 
 /**
  * @brief Controll the process; Charging LiFePO4 batteries

@@ -16,9 +16,9 @@
 #include <stdlib.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
-#include "AVR-lib/usart.h"
-#include "AVR-lib/timers.h"
-#include "AVR-lib/i2c_safe.h"
+#include "usart.h"
+#include "timers.h"
+#include "i2c_safe.h"
 #include "hardware.h"
 #include "log.h"
 #include "process-control.h"

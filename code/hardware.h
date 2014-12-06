@@ -14,10 +14,13 @@
 
 #pragma once
 #include <avr/io.h>
-#include "AVR-lib/adc.h"
-#include "AVR-lib/i2c_safe.h"
-#include "AVR-lib/usart.h"
-#include "AVR-lib/timers.h"
+#include "adc.h"
+#include "i2c_safe.h"
+#include "usart.h"
+#include "timers.h"
+#include "process-control.h"
+#include "esp120.h"
+#include "wd.h"
 
 /** 
  * This header/c file together setup the project specific hardware and resources
@@ -72,22 +75,32 @@
 
 /* Project specific defines */
 #define USART_BAUDE     38400   //Highest stable Baude at 16MhZ FCPU
-#define I2C_FREQ        100000  //Limit for the HP PSU
-#define PWM_TOP         0xFFFF  // PWM TOP value, 16bit.
+#define I2C_FREQ        50000  //Limit for the HP PSU
+#define PWM_TOP         0xFFF  // PWM TOP value, 12bit. Such that PWM Frequency is ClockSpeed(16Mhz)/(2*Prescaler(1)*TOP) = 1.953kHz
+#define PWM_START       0xFFF-1 // Which value to start the PWM at on powerup from cold 
 #define DESIGN_SOC      8960    // System design State of Charge in Ah
+
+#define PSU_WAIT_ON     10      //Time in seconds from PSU power on to output ready
 
 /* Hardware specific defines: */
 #define ONBOARD_LEDPort PORTB
 #define ONBOARD_LED_DriectionReg    DDRB
 #define ONBOARD_LED     PB5
 
+#define GREEN_LED       PB4
+#define RED_LED         PB3
+
+#define PSU_ON_PORT     PORTD
+#define PSU1_ON         PD3
+#define PSU2_ON         PD5
+
 #define VsensePort      PORTC
 #define VsensePin       PC0
 #define VsenseADC       ADC0
 #define VenseADC_REF    VREF_INTERNAL
 
-#define PSU1_ADDRESS    0xA0
-#define PSU2_ADDRESS    0xA1
+#define PSU1_ADDRESS    29
+#define PSU2_ADDRESS    30
 
 /**
  * @struct PSU_state, The state PSU's 1 and 2 from I2C data
@@ -111,6 +124,13 @@ struct PSU_state {
  * One call to rule them all
  */
 void init_hardware(void);
+
+/**
+ * @brief Initialise I/O ports
+ * 
+ * Initialise PIN I/O states that do not fall into the PWM, I2C/TWi etc categories
+ */
+void init_io_ports(void);
 
 /**
  * The followng are functions abstacting measurements into internal values.
@@ -153,7 +173,7 @@ uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type );
  * 
  * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
  **/
-void get_psu_state(struct PSU_state *psu_struct);
+void get_psu_state(struct Inputs *ProcessControlInputs);
 
 /**
  * @brief Get PSU's current
