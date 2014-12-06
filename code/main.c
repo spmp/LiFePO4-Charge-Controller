@@ -4,11 +4,11 @@
 #include <util/delay.h>
 
 #include "hardware.h"
-#include "wd.h"
+#include "AVR-lib/wd.h"
 #include "process-control.h"
 #include "command.h"
 #include "log.h"
-#include "usart.h"
+#include "AVR-lib/usart.h"
 
 // Watchdog and reset state.
 // "You're not suppose to call get_mcusr() in main().

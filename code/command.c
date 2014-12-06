@@ -12,9 +12,6 @@
  * @Date: July 2014
  *****************************************************************************/
 #include "command.h"
-#include "process-control.h"
-#include "i2c_safe.h"
-#include "esp120.h"
 
 uint8_t eloaded;
 uint8_t wloaded;

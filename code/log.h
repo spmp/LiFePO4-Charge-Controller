@@ -13,9 +13,10 @@
  *****************************************************************************/
 #pragma once
 #include <avr/io.h>
-#include "usart.h"
-#include "clock.h"
+#include "AVR-lib/usart.h"
+#include "AVR-lib/clock.h"
 #include "process-control.h"
+#include "AVR-lib/lib/pid.h"
 
 #ifndef LOG_ENABLE
 #define LOG_ENABLE 0 //1 log enabled, 0 log disabled

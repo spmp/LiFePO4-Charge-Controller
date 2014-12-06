@@ -16,9 +16,9 @@
 #include <avr/sleep.h>
 #include <util/delay.h>
 #include "hardware.h"
-#include "pid.h"
-#include "usart.h"
-#include "clock.h"
+#include "AVR-lib/lib/pid.h"
+#include "AVR-lib/usart.h"
+#include "AVR-lib/clock.h"
 #include "esp120.h"
 
 extern uint8_t PIDtype;

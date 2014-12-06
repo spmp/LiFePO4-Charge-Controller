@@ -12,8 +12,6 @@
  * @Date: July 2014
  *****************************************************************************/
 #include "log.h"
-#include "process-control.h"
-#include "pid.h"
 
 uint8_t logenable = LOG_ENABLE; //logging enabled/disabled at startup
 

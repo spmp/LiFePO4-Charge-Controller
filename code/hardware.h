@@ -14,13 +14,13 @@
 
 #pragma once
 #include <avr/io.h>
-#include "adc.h"
-#include "i2c_safe.h"
-#include "usart.h"
-#include "timers.h"
+#include "AVR-lib/adc.h"
+#include "AVR-lib/i2c_safe.h"
+#include "AVR-lib/usart.h"
+#include "AVR-lib/timers.h"
 #include "process-control.h"
 #include "esp120.h"
-#include "wd.h"
+#include "AVR-lib/wd.h"
 
 /** 
  * This header/c file together setup the project specific hardware and resources
