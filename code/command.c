@@ -56,7 +56,7 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
     
     uint8_t esp120reg;
     uint8_t PSUaddress;
-    PSUaddress = 31;
+    PSUaddress = 27;
     
     
     switch(commandname) {

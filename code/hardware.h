@@ -99,8 +99,8 @@
 #define VsenseADC       ADC0
 #define VenseADC_REF    VREF_INTERNAL
 
-#define PSU1_ADDRESS    29
-#define PSU2_ADDRESS    30
+#define PSU1_ADDRESS    27
+#define PSU2_ADDRESS    27
 
 /**
  * @struct PSU_state, The state PSU's 1 and 2 from I2C data

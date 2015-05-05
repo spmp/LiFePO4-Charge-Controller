@@ -121,7 +121,6 @@ void init_PID(struct Process *process)
  * @param *process, a struct of type Process in which to save the system state
  **/
 void get_state(struct Process *process) {
-    
     struct Inputs *inputs = &process->inputs;
     struct Outputs *outputs = &process->outputs;
     
