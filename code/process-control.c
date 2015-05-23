@@ -71,8 +71,8 @@ struct Process process = {
     .Ah_count = 30,          // How many Ah's have passed through the charger in this cycle
     .charge_timer = 0,      // How long have we been in the 'bulk' charging phase
     .cur_rest_time = 0,     // How long have we been resting?
-    .rest_timer = 0,        // How long do we need to rest for?
-    .float_timer = 0,        // How long do we need to float charge?
+    .rest_timer = 20,        // How long do we need to rest for?
+    .float_timer = 200,        // How long do we need to float charge?
     .charge_state = 0,      // State of charging, Bulk, rest, float, Done
     .error_code = 0,         // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
     .charge_progress = 0    // Percentage of charging done.
@@ -85,7 +85,7 @@ struct Process process = {
     .voltage_max = 1037,    // Absolute maximum battery voltage. Shutdown if over
     .voltage_min = 8300,       // Minimum battery voltage. Error or batteries disconnected if under.
     .voltage_threshold = 1035, // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
-    .voltage_charged = 1012, // Voltage at which to stop bulk charging
+    .voltage_charged = 1018, // Voltage at which to stop bulk charging
     .voltage_float = 976,   // Voltage at which to float the batteries
     .rest_time = 36,         // Time between charged voltage and driving or float/done. This is in seconds per Ah
     .max_PSU_temp = 70,      // Maximum temperature for any PSU before shutdown
@@ -246,7 +246,7 @@ void calculate_outputs(struct Process* process)
                         startPSUflag = 1;
                         _delay_ms(500);
                     }
-                    settings->PIDoutput = pid_proportional( inputs->voltage, settings->voltage_float, 1100, 0xFFF, 1, 1);
+                    settings->PIDoutput = pid_proportional_max( inputs->voltage, settings->voltage_float, 1100, 0xFFF, 0.25, 1, 30);
                 break;
             default:
                 //Turn off the PSU's
