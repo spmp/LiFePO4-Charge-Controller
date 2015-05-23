@@ -181,8 +181,8 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
                     
             case 'p':  // Set the program number
                 send_string_p(PSTR("Setting the program number to "));
-//                 outputs->charge_state = commandvalue;
-//                 send_uint16(outputs->charge_state);
+                PIDtype = commandvalue;
+                send_uint16(PIDtype);
                 send_newline();
                 break;
                     

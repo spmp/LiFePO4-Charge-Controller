@@ -33,9 +33,9 @@ void log_to_serial(struct Process *process) {
         send_string_p(PSTR(" v "));
         send_uint16(inputs->voltage);
         send_string_p(PSTR(" Progress "));
-        send_uint16(get_SoC(PERCENT));
+        send_uint8(PIDtype);
         send_string_p(PSTR(" Ahx100 "));
-        send_uint16(outputs->Ah_count);
+        send_uint32(outputs->Ah_count);
         send_string_p(PSTR(" Charge state "));
         send_uint16(outputs->charge_state);
         send_string_p(PSTR(" pwm "));

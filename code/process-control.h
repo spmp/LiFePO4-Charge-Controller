@@ -43,7 +43,7 @@ struct Inputs {
 struct Outputs {
     int16_t pwm_duty;          // Duty cycle of pwm_duty
     uint8_t  PSU_state;         // State of the PSU's
-    uint16_t Ah_count;          // How many Ah's have passed through the charger in this cycle. (Ahx100)
+    uint32_t Ah_count;          // How many Ah's have passed through the charger in this cycle. (Ahx100)
     uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
     uint16_t cur_rest_time;     // How long have we been resting?
     uint16_t rest_timer;        // How long do we need to rest for?

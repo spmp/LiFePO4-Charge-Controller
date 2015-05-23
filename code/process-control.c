@@ -130,7 +130,7 @@ void get_state(struct Process *process) {
     
     //Calculate Amp Hours assuming readings every 4th of a second
     Ah_QuarterSecond += inputs->current;
-    outputs->Ah_count += Ah_QuarterSecond/(6*6*4);
+    outputs->Ah_count += Ah_QuarterSecond/(60*60*4);
     
 // //     inputs->current = (psu_state.PSU1_current+psu_state.PSU1_current)/2;
     
@@ -196,10 +196,9 @@ void calculate_outputs(struct Process* process)
                         //Reset setpoint counter
                         setpoint_reached_counter = 0;
                         //FInish Cahrging here
-                        PIDtype = 0;
+                        //PIDtype = 0;
                         //Change to Waiting
-                        //PIDtype = 2;
-                        
+                        PIDtype = 2;                        
                     }
                 }
                 // Setpoint is not reached.
