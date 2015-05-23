@@ -130,7 +130,7 @@ void get_state(struct Process *process) {
     
     //Calculate Amp Hours assuming readings every 4th of a second
     Ah_QuarterSecond += inputs->current;
-    outputs->Ah_count += Ah_QuarterSecond/(60*60*4);
+    outputs->Ah_count += Ah_QuarterSecond/(60*60*10*4);
     
 // //     inputs->current = (psu_state.PSU1_current+psu_state.PSU1_current)/2;
     
@@ -219,8 +219,10 @@ void calculate_outputs(struct Process* process)
             case 2:
                 //wait
                 //TODO: Change light blinking pattern
-                if (timestamp >= outputs->charge_timer)
+                if (timestamp >= outputs->rest_timer)
+                {
                     PIDtype =3;
+                }
                 break;
                 
             case 3:

@@ -136,62 +136,118 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
                 send_string_p(PSTR("Ceasing to charge, Wright ANCHOR, STOP!! "));
                     outputs->charge_state = 4;
                 break;
-                    
-            case 'S':  // Set charge state
-                send_string_p(PSTR("Setting the charge state to "));
+                
+        case 'S':  // Set charge state
+            if (commandvalue == 0){
+                send_string_p(PSTR("The charge state is "));
+                send_uint16(outputs->charge_state);
+                send_newline();
+            }
+            else {
+                send_string_p(PSTR("Setting the rcharge state to "));
                 outputs->charge_state = commandvalue;
                 send_uint16(outputs->charge_state);
                 send_newline();
-                break;
-                    
-            case 'C':  // Set charge current
+            }
+            break;
+            
+        case 'C':  // Set charge current
+            if (commandvalue == 0){
+                send_string_p(PSTR("The charge current is "));
+                send_uint16(settings->current_charge);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the charge current to "));
                 settings->current_charge = commandvalue;
                 send_uint16(settings->current_charge);
                 send_newline();
-                break;
-                    
-            case 'V':  // Set charge Voltage
+            }
+            break;
+            
+        case 'V':  // Set charge Voltage
+            if (commandvalue == 0){
+                send_string_p(PSTR("The charge voltage is "));
+                send_uint16(settings->voltage_charged);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the charge voltage to "));
                 settings->voltage_charged = commandvalue;
                 send_uint16(settings->voltage_charged);
                 send_newline();
-                break;
-                    
-            case 'F':  // Set float voltage
+            }
+            break;
+            
+        case 'F':  // Set float voltage
+            if (commandvalue == 0){
+                send_string_p(PSTR("The float voltage is "));
+                send_uint16(settings->voltage_float);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the float voltage to "));
                 settings->voltage_float = commandvalue;
                 send_uint16(settings->voltage_float);
                 send_newline();
-                break;
-                    
-            case 'M':  // Max voltage
+            }
+            break;
+            
+        case 'M':  // Max voltage
+            if (commandvalue == 0){
+                send_string_p(PSTR("The maximum voltage is "));
+                send_uint16(settings->voltage_max);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the maximum voltage to "));
                 settings->voltage_max = commandvalue;
                 send_uint16(settings->voltage_max);
                 send_newline();
-                break;
-                    
-            case 'N':  // Max current
+            }
+            break;
+            
+        case 'N':  // Max current
+            if (commandvalue == 0){
+                send_string_p(PSTR("The maximum current is "));
+                send_uint16(settings->current_max);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the maximum current to "));
                 settings->current_max = commandvalue;
                 send_uint16(settings->current_max);
                 send_newline();
-                break;
-                    
-            case 'p':  // Set the program number
+            }
+            break;
+            
+        case 'p':  // Set the program number
+            if (commandvalue == 0){
+                send_string_p(PSTR("The charge program number is "));
+                send_uint16(PIDtype);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the program number to "));
                 PIDtype = commandvalue;
                 send_uint16(PIDtype);
                 send_newline();
-                break;
-                    
-            case 'T':  // Set the time
+            }
+            break;
+            
+        case 'T':  // Set the time
+            if (commandvalue == 0){
+                send_string_p(PSTR("The time is "));
+                send_uint16(timestamp);
+                send_newline();
+            }
+            else {
                 send_string_p(PSTR("Setting the time to "));
                 timestamp = commandvalue;
-                send_uint32_half(timestamp);
+                send_uint16(timestamp);
                 send_newline();
-                break;
+            }
+            break;
             
         case 'L': //logging
             if (commandvalue != 1){
