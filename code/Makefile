@@ -42,7 +42,7 @@ all: $(WORKDIR) $(WORKDIR)/$(TARGET).hex
 
 subdirs: $(WORKDIR)
 $(WORKDIR):
-	mkdir -p $@
+	mkdir -p $@/AVR-lib/lib
 
 # uploading the hex file to the AVR
 upload: all

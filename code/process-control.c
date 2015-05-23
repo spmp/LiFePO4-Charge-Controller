@@ -52,8 +52,6 @@ uint8_t setpoint_reached_counter = 0;
 uint8_t rest_init_flag = 0;
 uint8_t done_init_flag = 0;
 uint8_t startPSUflag = 0;
-uint32_t time_wait = 0;
-uint32_t time_finish = 0;
 uint32_t Ah_QuarterSecond = 0;
 
 /** @brief struct(s) for PID **/
@@ -71,12 +69,13 @@ struct Process process = {
     .pwm_duty = PWM_START,          // Duty cycle of pwm_duty
     .PSU_state = 20,         // State of the PSU's
     .Ah_count = 30,          // How many Ah's have passed through the charger in this cycle
-    .charge_timer = 40,      // How long have we been in the 'bulk' charging phase
-    .cur_rest_time = 50,     // How long have we been resting?
-    .rest_timer = 60,        // How long do we need to rest for?
-    .charge_state = 70,      // State of charging, Bulk, rest, float, Done
+    .charge_timer = 0,      // How long have we been in the 'bulk' charging phase
+    .cur_rest_time = 0,     // How long have we been resting?
+    .rest_timer = 0,        // How long do we need to rest for?
+    .float_timer = 0,        // How long do we need to float charge?
+    .charge_state = 0,      // State of charging, Bulk, rest, float, Done
     .error_code = 0,         // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
-    .charge_progress = 80    // Percentage of charging done.
+    .charge_progress = 0    // Percentage of charging done.
     },
     {
     .program_number = 1,     // An index for the process, such that process_control knows with process to run.
@@ -159,7 +158,16 @@ void calculate_outputs(struct Process* process)
 //      u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
 //     pid_proportional( int32_t Measured, int32_t setPoint, int32_t MeasuredMax, int32_t OutputMax, float Proportionality, uint8_t Power);
     
-    //Catch error states, and shutdown
+/*
+ * The process-control is primarily calculating outputs. This process is broken up as follows:
+ *   Check if any maximum conditions (current and voltage) are breached and shutdown if so.
+ *     The `PIDtype' sets the stage of the charging and is inspected by the switch/case statement.
+ *     The `PIDtype's are:
+ *       0 Stop. Stop charging, power off PSU's
+ *       1 Constant current (startup default). Bulk charging at settings->current_charge, until settings->voltage_charged is reached
+ *       2 Absorbtion. This stage waits for a period of time defined by the battery manufacturer
+ *       3 Constant voltage: A constant voltage is maintained for a further time period.
+ */
     if( (inputs->voltage >= settings->voltage_max) || (inputs->current >= settings->current_max)) {
 //             send_string_p(PSTR("OUTputs out of bounds, quitting PID/r/n"));
             settings->PIDoutput = PWM_START;
@@ -171,10 +179,10 @@ void calculate_outputs(struct Process* process)
     else {
            
         switch(PIDtype) {
-            case 1:
-                //Constant Current PID
+            case 1: //Constant Current PID
+                //Check if the voltage set point has been reached.
                 if (inputs->voltage >= settings->voltage_charged ){
-                    //TODO: Impliment a decriment of this counter ie.. setpoint+5, then in the main body setpoint-
+                    //TODO: Impliment a decriment of this counter ie.. setpoint+5, then in the main body setpoint- such that the setpoints must me reached sequentially.
                     setpoint_reached_counter++;
                     if (setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
                     {
@@ -183,8 +191,8 @@ void calculate_outputs(struct Process* process)
                         psu_power(3,0);
                         startPSUflag = 0;
                         // Calculate how long to wait.
-                        time_wait = timestamp*2;
-                        time_finish = timestamp*3;
+                        outputs->rest_timer = timestamp*2;
+                        outputs->float_timer = timestamp*3;
                         //Reset setpoint counter
                         setpoint_reached_counter = 0;
                         //FInish Cahrging here
@@ -194,7 +202,9 @@ void calculate_outputs(struct Process* process)
                         
                     }
                 }
+                // Setpoint is not reached.
                 else 
+                    //If the PSU's are not on/started they must be started/turned-on.
                     if(!startPSUflag)
                     {
                         //Start the PSU
@@ -203,19 +213,20 @@ void calculate_outputs(struct Process* process)
                         startPSUflag = 1;
                         _delay_ms(500);
                     }
+                    //Constant current PID
                     settings->PIDoutput = pid_proportional_current( inputs->current, settings->current_charge, 300, 25);
                 break;
                 
             case 2:
                 //wait
                 //TODO: Change light blinking pattern
-                if (timestamp >= time_wait)
+                if (timestamp >= outputs->charge_timer)
                     PIDtype =3;
                 break;
                 
             case 3:
                 //Constant Voltage PID
-                if (timestamp >= time_finish)
+                if (timestamp >= outputs->float_timer)
                 {
                     //ensure output returned to safe state
                     outputs->pwm_duty = PWM_START;
@@ -223,7 +234,7 @@ void calculate_outputs(struct Process* process)
                     psu_power(3,0);
                     startPSUflag = 0;
                     //Change to Done..
-                    PIDtype = 4;
+                    PIDtype = 0;
                 }
                 else
                     if(!startPSUflag)

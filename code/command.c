@@ -214,6 +214,34 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
                 send_string_p(PSTR("Process control enabled, disable with 'P'.\r\n"));
             }
             break;
+        
+        case '<': // Wait time
+            if (commandvalue == 0){
+                send_string_p(PSTR("The float time is "));
+                send_uint32(outputs->float_timer);
+                send_newline();
+            }
+            else {
+                send_string_p(PSTR("Setting the float time to "));
+                outputs->float_timer = commandvalue;
+                send_uint32(outputs->float_timer);
+                send_newline();
+            }
+            break;
+        
+        case '>': // Float time
+            if (commandvalue == 0){
+                send_string_p(PSTR("The rest time is "));
+                send_uint32(outputs->rest_timer);
+                send_newline();
+            }
+            else {
+                send_string_p(PSTR("Setting the rest time to "));
+                outputs->rest_timer = commandvalue;
+                send_uint32(outputs->rest_timer);
+                send_newline();
+            }
+            break;
 //BEGIN Dummy Input
         
         //Voltage

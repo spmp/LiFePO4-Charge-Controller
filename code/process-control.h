@@ -47,6 +47,7 @@ struct Outputs {
     uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
     uint16_t cur_rest_time;     // How long have we been resting?
     uint16_t rest_timer;        // How long do we need to rest for?
+    uint16_t float_timer;        // How long do we need to float charge?
     uint8_t  charge_state;      // State of charging; 0 not charging, 1 Bulk charging, 2 resting, 3 float charging,4 Done (examples), 7 stop - error
     uint8_t  error_code;        // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
     uint8_t  charge_progress;   // Percentage of charging done.
