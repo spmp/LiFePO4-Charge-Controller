@@ -79,9 +79,10 @@ struct Process process = {
     },
     {
     .program_number = 1,     // An index for the process, such that process_control knows with process to run.
-    .current_max = 40000,     // Absolute maximum current. Shutdown if over
+    .current_max = 35000,     // Absolute maximum current. Shutdown if over
     .current_threhold = 3500,// Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
     .current_charge = 30000, // Current to charge the batteries at
+    .current_float = 20000, // Max current for float charge
     .voltage_max = 1037,    // Absolute maximum battery voltage. Shutdown if over
     .voltage_min = 8300,       // Minimum battery voltage. Error or batteries disconnected if under.
     .voltage_threshold = 1035, // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
@@ -107,12 +108,12 @@ struct Process process = {
  * @brief Initialise the PID from Process struct
  * @param *process, a struct of type Process in which get the pid initialisation variables
  **/
-void init_PID(struct Process *process)
-{
-    struct Settings *settings = &process->settings;
-    u_pid_Init(settings->cc_P_Factor * SCALING_FACTOR, settings->cc_I_Factor * SCALING_FACTOR, settings->cc_D_Factor * SCALING_FACTOR, &pidData_cc);
-    u_pid_Init(settings->cv_P_Factor * SCALING_FACTOR, settings->cv_I_Factor * SCALING_FACTOR, settings->cv_D_Factor * SCALING_FACTOR, &pidData_cv);
-}
+// void init_PID(struct Process *process)
+// {
+//     struct Settings *settings = &process->settings;
+//     u_pid_Init(settings->cc_P_Factor * SCALING_FACTOR, settings->cc_I_Factor * SCALING_FACTOR, settings->cc_D_Factor * SCALING_FACTOR, &pidData_cc);
+//     u_pid_Init(settings->cv_P_Factor * SCALING_FACTOR, settings->cv_I_Factor * SCALING_FACTOR, settings->cv_D_Factor * SCALING_FACTOR, &pidData_cv);
+// }
 
 /**
  * @brief Get the state of the system, input values and output states
@@ -246,7 +247,14 @@ void calculate_outputs(struct Process* process)
                         startPSUflag = 1;
                         _delay_ms(500);
                     }
-                    settings->PIDoutput = pid_proportional_max( inputs->voltage, settings->voltage_float, 1100, 0xFFF, 0.25, 1, 30);
+                    if( inputs->current >= settings->current_float )
+                    {
+                        settings->PIDoutput = pid_proportional_current( inputs->current, settings->current_float, 300, 25);
+                    }
+                    else
+                    {
+                        settings->PIDoutput = pid_proportional_max( inputs->voltage, settings->voltage_float, 1100, 0xFFF, 0.25, 1, 30);
+                    }
                 break;
             default:
                 //Turn off the PSU's
@@ -542,7 +550,22 @@ void calculate_outputs(struct Process* process)
  **/
 void check_limits(struct Process* process)
 {
-    //
+    struct Inputs *inputs = &process->inputs;
+    struct Outputs *outputs = &process->outputs;
+    struct Settings *settings = &process->settings;
+    
+    //Check if any of the stop conditions are reached.
+    if((inputs->current >= settings->current_max) || (inputs->voltage >= settings->voltage_max))
+    {
+        //ensure output returned to safe state
+        outputs->pwm_duty = PWM_START;
+        //Turn off the PSU's
+        psu_power(3,0);
+        startPSUflag = 0;
+        //Change to Done..
+        PIDtype = 0;
+        send_string_p(PSTR("A stop condition was breached. Shutting down.\r\n"));
+    }
 }
 
 /**
@@ -635,11 +658,11 @@ void process_control(struct Process *process)
     /** Now lets calculate how to change things to maintain the process **/
     calculate_outputs(process);
     
-    /** Lets check that nothing has gone wrong or will go wrong if we use these settings **/
-//     check_limits(process);
-    
     /** Now we set the proposed updates to hardware **/
     set_outputs(process);
+    
+    /** Lets check that nothing has gone wrong or will go wrong if we use these settings **/
+    check_limits(process);
     
     //Process_control has finished
     process_control_running_flag = 0;

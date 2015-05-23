@@ -57,7 +57,7 @@ int main() {
     cli();
     set_sleep_mode(SLEEP_MODE_IDLE);
     init_hardware();
-    init_PID(&process);
+//     init_PID(&process);
     sei();
     
     //Send initialisation message:

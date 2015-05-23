@@ -58,6 +58,7 @@ struct Settings {
     uint16_t current_max;       // Absolute maximum current. Shutdown if over
     uint16_t current_threhold;  // Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
     uint16_t current_charge;    // Current to charge the batteries at
+    uint16_t current_float;     // Max current for float charge
     uint16_t voltage_max;       // Absolute maximum battery voltage. Shutdown if over
     uint16_t voltage_min;       // Minimum battery voltage. Error or batteries disconnected if under.
     uint16_t voltage_threshold; // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
