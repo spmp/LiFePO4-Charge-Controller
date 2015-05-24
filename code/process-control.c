@@ -190,7 +190,7 @@ void calculate_outputs(struct Process* process)
                     {
                         //Turn off the PSU's
                         outputs->pwm_duty = PWM_START;
-		        settings->PIDoutput = 0;
+                        settings->PIDoutput = 0;
                         psu_power(3,0);
                         startPSUflag = 0;
                         // Calculate how long to wait.
@@ -202,7 +202,7 @@ void calculate_outputs(struct Process* process)
                         //PIDtype = 0;
                         //Change to Waiting
                         PIDtype = 2;
-		        break;
+                        break;
                     }
                 }
                 // Setpoint is not reached.
@@ -235,20 +235,20 @@ void calculate_outputs(struct Process* process)
                 {
                     //ensure output returned to safe state
                     outputs->pwm_duty = PWM_START;
-	            settings->PIDoutput = 0;
+                    settings->PIDoutput = 0;
                     //Turn off the PSU's
                     psu_power(3,0);
                     startPSUflag = 0;
                     //Change to Done..
                     PIDtype = 0;
-		    break;
+                    break;
                 }
                 else
                     if(!startPSUflag)
                     {
                         //Start the PSU
                         outputs->pwm_duty = PWM_START;
-		        outputs->pwm_duty = PWM_START;
+                        outputs->pwm_duty = PWM_START;
                         psu_power(3,1);
                         startPSUflag = 1;
                         _delay_ms(1000);
@@ -265,10 +265,10 @@ void calculate_outputs(struct Process* process)
             default:
                 //Turn off the PSU's
                 outputs->pwm_duty = PWM_START;
-	        settings->PIDoutput = 0;
+                settings->PIDoutput = 0;
                 psu_power(3,0);
                 startPSUflag = 0;
-	        PIDtype = 0;
+                PIDtype = 0;
         }
     
     }
