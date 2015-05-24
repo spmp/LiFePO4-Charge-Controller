@@ -34,16 +34,18 @@ void log_to_serial(struct Process *process) {
         send_uint16(inputs->voltage);
         send_string_p(PSTR(" Progress "));
         send_uint8(PIDtype);
-        send_string_p(PSTR(" Ahx100 "));
+        send_string_p(PSTR(" Ah "));
         send_uint16(outputs->Ah_count);
-        send_string_p(PSTR(" Charge state "));
-        send_uint16(outputs->charge_state);
+//        send_string_p(PSTR(" Charge state "));
+//        send_uint16(outputs->charge_state);
         send_string_p(PSTR(" pwm "));
         send_uint16(outputs->pwm_duty);
         send_string_p(PSTR(" Vsp "));
         send_uint16(settings->voltage_charged);
         send_string_p(PSTR(" Csp "));
         send_uint16(settings->current_charge);
+        send_string_p(PSTR(" Vf "));
+        send_uint16(settings->voltage_float);
         send_string_p(PSTR(" PiD "));
         if (settings->PIDoutput < 0){
             send_string_p(PSTR("-"));
@@ -52,6 +54,21 @@ void log_to_serial(struct Process *process) {
         else {
             send_uint16(settings->PIDoutput);
         }
+        send_string_p(PSTR(" Wait "));
+        switch(PIDtype) 
+	 {	    
+     case 2:
+       send_uint32(outputs->rest_timer - timestamp);
+       break;
+     case 3:
+       send_uint32(outputs->float_timer - timestamp);
+       break;
+	  default:
+	    send_uint8(0);
+	    break;
+	 }
+       
+	      
             
             
 //         send_string_p(PSTR(" P "));

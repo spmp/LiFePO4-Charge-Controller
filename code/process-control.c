@@ -68,11 +68,11 @@ struct Process process = {
     {
     .pwm_duty = PWM_START,          // Duty cycle of pwm_duty
     .PSU_state = 20,         // State of the PSU's
-    .Ah_count = 30,          // How many Ah's have passed through the charger in this cycle
+    .Ah_count = 0,          // How many Ah's have passed through the charger in this cycle
     .charge_timer = 0,      // How long have we been in the 'bulk' charging phase
     .cur_rest_time = 0,     // How long have we been resting?
-    .rest_timer = 20,        // How long do we need to rest for?
-    .float_timer = 200,        // How long do we need to float charge?
+    .rest_timer = 0,        // How long do we need to rest for?
+    .float_timer = 0,        // How long do we need to float charge?
     .charge_state = 0,      // State of charging, Bulk, rest, float, Done
     .error_code = 0,         // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
     .charge_progress = 0    // Percentage of charging done.
@@ -86,8 +86,8 @@ struct Process process = {
     .voltage_max = 1037,    // Absolute maximum battery voltage. Shutdown if over
     .voltage_min = 8300,       // Minimum battery voltage. Error or batteries disconnected if under.
     .voltage_threshold = 1035, // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
-    .voltage_charged = 1018, // Voltage at which to stop bulk charging
-    .voltage_float = 976,   // Voltage at which to float the batteries
+    .voltage_charged = 1013, // Voltage at which to stop bulk charging
+    .voltage_float = 942,   // Voltage at which to float the batteries
     .rest_time = 36,         // Time between charged voltage and driving or float/done. This is in seconds per Ah
     .max_PSU_temp = 70,      // Maximum temperature for any PSU before shutdown
     .max_PSU_volt = 300,     // Maximum PSU line voltage
@@ -130,8 +130,8 @@ void get_state(struct Process *process) {
     inputs->voltage = get_voltage();
     
     //Calculate Amp Hours assuming readings every 4th of a second
-    Ah_QuarterSecond += inputs->current;
-    outputs->Ah_count += Ah_QuarterSecond/(60*60*10*4);
+    //Ah_QuarterSecond += inputs->current;
+    outputs->Ah_count += inputs->current/(60*60*10*4);
     
 // //     inputs->current = (psu_state.PSU1_current+psu_state.PSU1_current)/2;
     
@@ -171,7 +171,8 @@ void calculate_outputs(struct Process* process)
  */
     if( (inputs->voltage >= settings->voltage_max) || (inputs->current >= settings->current_max)) {
 //             send_string_p(PSTR("OUTputs out of bounds, quitting PID/r/n"));
-            settings->PIDoutput = PWM_START;
+            settings->PIDoutput = 0;
+            outputs->pwm_duty = PWM_START;
             //Turn off the PSU's
             psu_power(3,0);
             PIDtype = 0;
@@ -189,6 +190,7 @@ void calculate_outputs(struct Process* process)
                     {
                         //Turn off the PSU's
                         outputs->pwm_duty = PWM_START;
+		        settings->PIDoutput = 0;
                         psu_power(3,0);
                         startPSUflag = 0;
                         // Calculate how long to wait.
@@ -199,7 +201,8 @@ void calculate_outputs(struct Process* process)
                         //FInish Cahrging here
                         //PIDtype = 0;
                         //Change to Waiting
-                        PIDtype = 2;                        
+                        PIDtype = 2;
+		        break;
                     }
                 }
                 // Setpoint is not reached.
@@ -232,20 +235,23 @@ void calculate_outputs(struct Process* process)
                 {
                     //ensure output returned to safe state
                     outputs->pwm_duty = PWM_START;
+	            settings->PIDoutput = 0;
                     //Turn off the PSU's
                     psu_power(3,0);
                     startPSUflag = 0;
                     //Change to Done..
                     PIDtype = 0;
+		    break;
                 }
                 else
                     if(!startPSUflag)
                     {
                         //Start the PSU
                         outputs->pwm_duty = PWM_START;
+		        outputs->pwm_duty = PWM_START;
                         psu_power(3,1);
                         startPSUflag = 1;
-                        _delay_ms(500);
+                        _delay_ms(1000);
                     }
                     if( inputs->current >= settings->current_float )
                     {
@@ -259,8 +265,10 @@ void calculate_outputs(struct Process* process)
             default:
                 //Turn off the PSU's
                 outputs->pwm_duty = PWM_START;
+	        settings->PIDoutput = 0;
                 psu_power(3,0);
                 startPSUflag = 0;
+	        PIDtype = 0;
         }
     
     }
@@ -268,6 +276,7 @@ void calculate_outputs(struct Process* process)
     
     //Check PWM output --> Inverted (ie high = low output so use -= )
     outputs->pwm_duty -= settings->PIDoutput;
+    //settings->PIDoutput = 0;
     // Maintain PWM Limits/Boundaries
     if (outputs->pwm_duty >= PWM_TOP-1){
         outputs->pwm_duty = PWM_TOP-2;
@@ -559,6 +568,7 @@ void check_limits(struct Process* process)
     {
         //ensure output returned to safe state
         outputs->pwm_duty = PWM_START;
+        settings->PIDoutput = 0;
         //Turn off the PSU's
         psu_power(3,0);
         startPSUflag = 0;

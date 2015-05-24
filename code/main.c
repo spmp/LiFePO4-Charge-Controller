@@ -83,7 +83,7 @@ int main() {
         wd_reset();
     }
     process_control_enable();           //Enable Process Control
-    PIDtype = 2;                        //Enable temporary current control programme.
+    PIDtype = 1;                        //Enable temporary current control programme.
     
     for (;;) {
         sleep_mode(); // blocked until after an interrupt has fired
