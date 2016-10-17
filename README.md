@@ -8,6 +8,7 @@ battery packs based on the HP Blade power supply ESP-120.
 Principal of operation
 ----------------------
 LiFePO4 batteries have a relativly simple charging profile:
+
  * Charge at constant current up to a set voltage, usually 3.65Volts per cell
  * Turn off charging and rest the batteries for a given time
  * If you must, float the batteries at 3.45Vpc
@@ -27,41 +28,65 @@ whilst monitoring the current until the desired current is reached.
 Vin is decreased to maintain this constant current until There
 setpoint is reached, at which point the PSU's are turned off.
 
-The PSU's are protected by a very large diode (75A, 200V).
+The PSU's are protected by a very large external diode (75A, 200V).
 
 The planned itterations are as follows, with each mature
 and completed iteration being moved into its appropriate 
 folder upon completion:
 
-Itterations:
+Repo layout
+-----------
+```
+.
+├── code            Charge controller logic
+│   └── AVR-lib     General AVR libraries. Should be a submodule
+│       └── lib
+├── doc             Documents relating to the ESP-120/HP3KW
+├── pcb             Output PCB files
+└── schematic       Schematic
+```
+
+The code is written in C using [Kdevelop] and built using [avr-gcc].
+
+The schematic and PCB layout are done in [Kicad]
+
+Current Implimentation
+----------------------
+Photos to come
+
+
+Iterations:
 ------------
- 1.  **Mark I: Proof of concept using onboard**
-  - Construction on breadboard
-  - Powered off the PSU power GND - 12V via an LM7805, so has common ground with Cycle Analyst
-  - shunt and differential opamp via built in 10bit ADC for current measurement
-  - 100:1 resistor divider via 10bit ADC for output voltage measurement
-  - Output is a PWM based 'DAC' to a fet/transistor between two pot's setting max/min voltage.
-  - Output/input via isolated serial interface.
+1.  **Mark I: Proof of concept using onboard**
+
+    - Construction on breadboard
+    - Powered off the PSU power GND - 12V via an LM7805, so has common ground with Cycle Analyst
+    - shunt and differential opamp via built in 10bit ADC for current measurement
+    - 100:1 resistor divider via 10bit ADC for output voltage measurement
+    - Output is a PWM based 'DAC' to a fet/transistor between two pot's setting max/min voltage.
+    - Output/input via isolated serial interface.
   
- 2.  **Mark II: further improvements**
-  - Impliment isolated I2C to PSU controllers for PSON and current measurement.
-  - Check PSU current VS shunt current, once verified they are the same with similar reliability, discontinue use of shunt.
-  - Impliment software usart for Rx only to recieve SOC etc. from the cycle analyst
-  - Assess whether external DAC's and ADC's are nescesarry.
-  - Likely that external ADC will be, so use it.
-  - Investigate and impliment different charging strategies.
-  - LCD?
-  - BMS integration
+2.  **Mark II: further improvements**
+    - Impliment isolated I2C to PSU controllers for PSON and current measurement.
+    - Check PSU current VS shunt current, once verified they are the same with similar reliability, discontinue use of shunt.
+    - Impliment software usart for Rx only to recieve SOC etc. from the cycle analyst
+    - Assess whether external DAC's and ADC's are nescesarry.
+    - Likely that external ADC will be, so use it.
+    - Investigate and impliment different charging strategies.
+    - LCD?
+    - BMS integration
   
- 3.  **Mark III: Close to Final** 
-  - PCB based, on its own board. 
-  - Use specialised AVR with CAN support
-  - Similar codebase to MarkII, trying to remove interrupt driven routines
-  - Safety/Failsafe etc. much more error checking.
-  - Impliment CAN somehow
-  
-Mark I: Proof of concept using onboard, Design considerations
-===============================================================
+3.  **Mark III: Close to Final** 
+    - PCB based, on its own board. 
+    - Use specialised AVR with CAN support
+    - Similar codebase to MarkII, trying to remove interrupt driven routines
+    - Safety/Failsafe etc. much more error checking.
+    - Impliment CAN somehow
+
+Currently half way through Iteration 2. Soon BMS integration will be required, and maybe we will do CAN bus things then too. Maybe port to STM32.
+
+
+### Mark I: Proof of concept using onboard, Design considerations
 
 Inputs:
 -------
@@ -104,12 +129,6 @@ Outputs:
    - State of charge bar graph for in the window 8)
    - Even better would be EL wire or tape on the exterior.
 
-Programe Flow:
---------------
-
-
-Thing to Learn
-==============
-1. PWM
-2. OP-Amps (again)
-3. Software UART (Rx)
+[Kdevelop]: https://www.kdevelop.org/
+[avr-gcc]: http://www.nongnu.org/avr-libc/
+[kicad]: http://kicad-pcb.org/
