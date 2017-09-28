@@ -16,11 +16,11 @@ LiFePO4 batteries have a relatively simple charging profile:
 ![Charger overview](doc/Charger-block-diagram.png)
 
 ### Charge control
-Thanks to the efforts of a German group the ESP-120 is well documented with a known and stable voltage control from 30-53V with positive voltage into a trim-pot pin and 53-63 with a slight
-negative voltage to this pin. There is an inverse relationship between voltage at the pot, and the supplies output voltage.
-
-~5Vin=> 30Vout, 0Vin=>53Vout.
-
+Thanks to the efforts of a German group the ESP-120 is well documented with a known and stable voltage control from 30-53V with positive voltage into a trim-pot pin, and 53-63V with a slight negative voltage to this pin. There is an inverse relationship between voltage at the pot, and the supplies output voltage:
+```
+~5Vin => 30Vout
+ 0Vin => 53Vout
+```
 To operate as a charger two (or more) PSU's are connected in series which is possible as the DC output is isolated from
 the case.
 To achieve constant current charging, the voltage of the supplies is brought up slowly by modifying (decreasing) Vin 
@@ -29,7 +29,7 @@ whilst monitoring the current until the desired current is reached.
 Not all PSU's in series need to modify their output voltage in order to achieve fine grained charge control. In my case one PSU has a varying voltage, and one does not.
 The PSU's with a varying voltage are modified by removing the trim-pot and cutting/modding traces at the output plug to allow the signals to be routed from external connector.
 
-The PSU's are protected by a very large external diode (75A, 200V).
+The PSU's are protected by a large external diode (75A, 200V).
 
 ### Cell Top Modules
 Each battery cell has a CTM across it which:
@@ -90,11 +90,6 @@ The code is written in C++/Arduino using [PlatformIO], ideally exporting to Make
 
 The schematic and PCB layout are done in [Kicad]
 
-Current Implementation
-----------------------
-Photos to come
-
-
 Inputs:
 -------
  **Current:** 
@@ -143,6 +138,31 @@ Outputs:
   
  **Phone App:**
    An Android app using Bluetooth would be the ideal solution for greatest versatility
+
+Power supply modifications
+--------------------------
+In order for the PSU's to be variable voltage some minor modifications need to be made:
+
+### Trimpot, `Vin`
+A trimpot needs to be removed and wires attached as `Vin`:
+Remove surrounding plugs, clear off silicoln blob, and heat it up any way yo can 8)
+![Trimpot mod](doc/PSUModifications/VinMod.png)
+
+### Interface board
+The _interface board_, the PCB with the external power and data plug, needs to be modified such that we can get the 12V out, and `Vin` in, whilst maintaining `PSON` and `I2C` functionality:
+![Inerface board1](doc/PSUModifications/InterfaceBoard1.png)
+![Inerface board2](doc/PSUModifications/InterfaceBoard2.png)
+
+### 12V supply
+**Note:** The 12V supply may not be required.
+
+12V is most easily tapped from the left hand leg of a diode on the secondary power board as shown below:
+![12V](doc/PSUModifications/12Vout.png)
+
+PCB's and circuit considerations
+--------------------------------
+
+
 
 [platformIO]: http://platformio.org/
 [kicad]: http://kicad-pcb.org/
