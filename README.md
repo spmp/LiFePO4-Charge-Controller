@@ -1,39 +1,79 @@
 LiFePO4 Charge Controller
 =========================
 
-This is a rolling project to create a fully automatic
-_LiFePO4_ battery charger for my, and possibly other 
-battery packs based on the HP Blade power supply ESP-120.
+This project is for a fully automatic
+_LiFePO4_ battery charger for my, utilising the HP Blade power supply ESP-120 as power source, and fully integrated with a Cell Top Module (CTM) Battery Management System (BMS). The _charger_ is essentially a battery monitor and manager that also charges when power is available to the vehicle.
 
 Principal of operation
 ----------------------
-LiFePO4 batteries have a relativly simple charging profile:
+LiFePO4 batteries have a relatively simple charging profile:
 
- * Charge at constant current up to a set voltage, usually 3.65Volts per cell
- * Turn off charging and rest the batteries for a given time
- * If you must, float the batteries at 3.45Vpc
+ * Charge at constant current until the maximum cell voltage is just below the balancing voltage
+ * Vary charge voltage ensuring the maximum cell voltage is (just) below balancing voltage until the charge current is at or below 1A
+ * Once charge current is at or below 1A charge at 1A until all cells are balancing
  
-Thanks to the efforts of a German group the ESP-120 is well
-documented with a known and stable voltage control from 30-53V
-with positive voltage into a trim-pot pin and 53-63 with a slight
-negative voltage to this pin. There is an inverse relationship
-between voltage at the pot, and the supplies output voltage.
+### Overview
+![Charger overview](doc/Charger-block-diagram.png)
+
+### Charge control
+Thanks to the efforts of a German group the ESP-120 is well documented with a known and stable voltage control from 30-53V with positive voltage into a trim-pot pin and 53-63 with a slight
+negative voltage to this pin. There is an inverse relationship between voltage at the pot, and the supplies output voltage.
+
 ~5Vin=> 30Vout, 0Vin=>53Vout.
 
-To operate as a charger two of these units are connected
-in series. This is easy as the DC output is isolated from
-the case. To achieve constant current charging, the voltage of the
-supplies is brought up slowly by modifying (decreasing) Vin 
+To operate as a charger two (or more) PSU's are connected in series which is possible as the DC output is isolated from
+the case.
+To achieve constant current charging, the voltage of the supplies is brought up slowly by modifying (decreasing) Vin 
 whilst monitoring the current until the desired current is reached.
-Vin is decreased to maintain this constant current until There
-setpoint is reached, at which point the PSU's are turned off.
+
+Not all PSU's in series need to modify their output voltage in order to achieve fine grained charge control. In my case one PSU has a varying voltage, and one does not.
+The PSU's with a varying voltage are modified by removing the trim-pot and cutting/modding traces at the output plug to allow the signals to be routed from external connector.
 
 The PSU's are protected by a very large external diode (75A, 200V).
 
-The planned itterations are as follows, with each mature
-and completed iteration being moved into its appropriate 
-folder upon completion:
+### Cell Top Modules
+Each battery cell has a CTM across it which:
+ * Measures cell voltage
+ * Measures cell temperature
+ * Switches on a 1A load once `Vbalance` is reached
 
+The CTM's are connected in a daisy chain and communicate via serial with the cell top monitor. The CTM state's are found by sending an initialisation message to the first CTM, which adds its state to the message and passes it to the next CTM etc. until finally the packet with all cell states arrives back at the monitor. 
+
+## Project iterations
+1.  **Mark I: Proof of concept using onboard** (Done)
+
+    - Construction on breadboard
+    - Powered off the PSU power GND - 12V via an LM7805, so has common ground with Cycle Analyst
+    - shunt and differential opamp via built in 10bit ADC for current measurement
+    - 100:1 resistor divider via 10bit ADC for output voltage measurement
+    - Output is a PWM based 'DAC' to a fet/transistor between two pot's setting max/min voltage.
+    - Output/input via isolated serial interface.
+  
+2.  **Mark II: further improvements** (Done)
+    - Impliment isolated I2C to PSU controllers for PSON and current measurement.
+    - Check PSU current VS shunt current, once verified they are the same with similar reliability, discontinue use of shunt.
+    - Implement software USART for Rx only to receive SOC etc. from the cycle analyst
+    - Assess whether external DAC's and ADC's are necessary.
+    - Likely that external ADC will be, so use it.
+    - Investigate and implement different charging strategies.
+    - LCD?
+    - BMS integration
+  
+3.  **Mark III: Integrated controller** (In progress)
+    - ESP32 platform, on separate board as PSU's so can run independently
+    - Arduino codebase for greater platform independence and collaboration
+    - Integrated CTM monitor
+    - Custom PSU plug boards.
+        1. Modified PSU for varying voltage output
+        2. Unmodified PSU
+        3. Boards plug together on edges for stackability
+    - Voltage control via I2C DAC
+    - Current measurement from external shunt
+        - Optional current measurement on PSU plug board
+    - Voltage measurement at battery terminal
+    - WiFi and Bluetooth interface
+    - Optional I2C display interface
+    
 Repo layout
 -----------
 ```
@@ -46,81 +86,53 @@ Repo layout
 └── schematic       Schematic
 ```
 
-The code is written in C using [Kdevelop] and built using [avr-gcc].
+The code is written in C++/Arduino using [PlatformIO], ideally exporting to Makefile.
 
 The schematic and PCB layout are done in [Kicad]
 
-Current Implimentation
+Current Implementation
 ----------------------
 Photos to come
 
 
-Iterations:
-------------
-1.  **Mark I: Proof of concept using onboard**
-
-    - Construction on breadboard
-    - Powered off the PSU power GND - 12V via an LM7805, so has common ground with Cycle Analyst
-    - shunt and differential opamp via built in 10bit ADC for current measurement
-    - 100:1 resistor divider via 10bit ADC for output voltage measurement
-    - Output is a PWM based 'DAC' to a fet/transistor between two pot's setting max/min voltage.
-    - Output/input via isolated serial interface.
-  
-2.  **Mark II: further improvements**
-    - Impliment isolated I2C to PSU controllers for PSON and current measurement.
-    - Check PSU current VS shunt current, once verified they are the same with similar reliability, discontinue use of shunt.
-    - Impliment software usart for Rx only to recieve SOC etc. from the cycle analyst
-    - Assess whether external DAC's and ADC's are nescesarry.
-    - Likely that external ADC will be, so use it.
-    - Investigate and impliment different charging strategies.
-    - LCD?
-    - BMS integration
-  
-3.  **Mark III: Close to Final** 
-    - PCB based, on its own board. 
-    - Use specialised AVR with CAN support
-    - Similar codebase to MarkII, trying to remove interrupt driven routines
-    - Safety/Failsafe etc. much more error checking.
-    - Impliment CAN somehow
-
-Currently half way through Iteration 2. Soon BMS integration will be required, and maybe we will do CAN bus things then too. Maybe port to STM32.
-
-
-### Mark I: Proof of concept using onboard, Design considerations
-
 Inputs:
 -------
  **Current:** 
-   Current will be measured using the shunt resistor on the PSU's PCB.
-   It has a resistance of 0.0002Ohm, and will require a diffrential opamp
-   in order to amplify the signal to the 5V range. There is already an opamp
-   on the PCB that does this, and it may be sufficient to use this.
+   Current will be measured using an external 75mV shunt and an op-amp. As the battery and the controller share the same ground there is no need to use a differential op-amp. 
+   This will be read by an internal (to the ESP-32) 12bit SAR ADC using the internal 1.1`Vref`.
+   Current measurements can also be taken from the PSU via I2C.
    
-   One 10bit ADC channel on the micro will do this, preferebly with the 
-   1.25V internal reference.
+ **Battery Voltage:**
+   Battery voltage will be measured via a 100k:1k resistor divider network protected with a zener diode. A dedicated `Vsense` lead will be attached to the positive battery terminal to avoid voltage drops in wires and diodes influencing the voltage.
+   This will be read by an internal (to the ESP-32) 12bit SAR ADC using the internal 1.1`Vref`.
    
-   With a maximum current of say 60A, the finest measurement we can make is:
-     60/1024 = 59mA
-   which is sufficient.
+ **PSU State:**
+   The PSU state can be inspected via isolated I2C, and returns the following and more:
    
- **Output Voltage**
-   Output volatage will be measured by another 10bit ADC channel via a 100k:1k 
-   resistor divider network.
-   Using the internal 1.25 voltage reference, this gives a maximum measurable voltage of
-   125V with an accuracy of 0.122, again, more than sufficient!
-   (DAC RC calculator)[http://sim.okawa-denshi.jp/en/PWMtool.php]
+   - Line voltage
+   - Output current
+   - Temperature
+   
+ **CTM:**
+   CTM state will be inspected via isolated serial, and gives us the following per cell:
+   
+   - Cell voltage
+   - Cell temperature
+   - Cell state
+     - Balancing
+     - Over voltage
+     - Over temperature
    
 Outputs:
 --------
  **Vin:**
-   Volatage between power ground and a pad from a reomoved potentiometer needs to 
-   be adjusted from ~5V to 0V.
-   
-   In this implimentation we will use PWM driving a fet to ground on from the 5V supply rail
-   with the pot pin in the middle, and a 330nF cap to ground.
-   
+   The PSU control voltage, `Vin` will be controlled via I2C DAC via an inverting op-amp to ensure the power on state is high.
+      
  **Serial:**
    Debugging and logging will be via serial
+ 
+ **I2C Display:**
+   An (optional) I2C display will show the per cell voltage and other state information
    
  **LED's and stuff:**
    - Blinking light (things alive)
@@ -128,7 +140,9 @@ Outputs:
    - Complete
    - State of charge bar graph for in the window 8)
    - Even better would be EL wire or tape on the exterior.
+  
+ **Phone App:**
+   An Android app using Bluetooth would be the ideal solution for greatest versatility
 
-[Kdevelop]: https://www.kdevelop.org/
-[avr-gcc]: http://www.nongnu.org/avr-libc/
+[platformIO]: http://platformio.org/
 [kicad]: http://kicad-pcb.org/
