@@ -1,0 +1,9 @@
+[submodule "code/BMScomms"]
+	path = code/BMScomms
+	url = https://github.com/spmp/BMScomms.git
+[submodule "code/softuart"]
+	path = code/softuart
+	url = https://github.com/spmp/avr-softuart.git
+[submodule "code/AVR-lib"]
+	path = code/AVR-lib
+	url = https://github.com/spmp/AVR-lib.git
