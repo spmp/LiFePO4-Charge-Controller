@@ -3,12 +3,12 @@
 #include <avr/sleep.h>
 #include <util/delay.h>
 
-#include "hardware.h"
 #include "AVR-lib/wd.h"
+#include "AVR-lib/usart.h"
+#include "hardware.h"
 #include "process-control.h"
 #include "command.h"
 #include "log.h"
-#include "AVR-lib/usart.h"
 
 // Watchdog and reset state.
 // "You're not suppose to call get_mcusr() in main().
@@ -21,7 +21,6 @@ void resetFlagsInit(void)
   // save the reset flags passed from the bootloader
   __asm__ __volatile__ ("mov %0, r2\n" : "=r" (resetFlags) :);
 }
-
 
 /**
  * @var send_log, whether to log to USART or not
@@ -62,7 +61,7 @@ int main() {
     
     //Send initialisation message:
     // TODO: This will show how many resets... after the R
-    send_string_p(PSTR("Rx LiFePO4 Charge Controller for ESP-120 PSU's. V:0.2.0. Jasper Aorangi 2014. Have a nice day 8): "));
+    send_string_p(PSTR("Rx LiFePO4 Charge Controller for ESP-120 PSU's. V:0.2.0. Jasper Aorangi 2017. Have a nice day 8): "));
     send_uint16(resetFlags);
     send_string_p(PSTR(" x\r\n"));
     

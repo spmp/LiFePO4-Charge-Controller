@@ -13,7 +13,7 @@
 
 
 # ========== Edit below here ========= #
-SOURCES = main.c AVR-lib/timers.c AVR-lib/usart.c command.c AVR-lib/i2c_safe.c AVR-lib/adc.c AVR-lib/lib/pid.c log.c hardware.c process-control.c esp120.c
+SOURCES = main.c BMScomms/BMScomms.c softuart/softuart.c AVR-lib/timers.c AVR-lib/usart.c command.c AVR-lib/adc.c AVR-lib/lib/pid.c log.c hardware.c process-control.c
 PORT = /dev/ttyUSB*
 BAUD_RATE = 115200
 MCU = atmega328p
@@ -42,7 +42,7 @@ all: $(WORKDIR) $(WORKDIR)/$(TARGET).hex
 
 subdirs: $(WORKDIR)
 $(WORKDIR):
-	mkdir -p $@/AVR-lib/lib
+	mkdir -p $@/AVR-lib/lib $@/softuart $@/BMScomms
 
 # uploading the hex file to the AVR
 upload: all

@@ -15,12 +15,11 @@
 #pragma once
 #include <avr/io.h>
 #include "AVR-lib/adc.h"
-#include "AVR-lib/i2c_safe.h"
 #include "AVR-lib/usart.h"
 #include "AVR-lib/timers.h"
-#include "process-control.h"
-#include "esp120.h"
 #include "AVR-lib/wd.h"
+#include "process-control.h"
+#include "BMScomms/BMScomms.h"
 
 /** 
  * This header/c file together setup the project specific hardware and resources
@@ -99,23 +98,6 @@
 #define VsenseADC       ADC0
 #define VenseADC_REF    VREF_INTERNAL
 
-#define PSU1_ADDRESS    24
-#define PSU2_ADDRESS    24
-
-/**
- * @struct PSU_state, The state PSU's 1 and 2 from I2C data
- **/
-struct PSU_state {
-    uint16_t PSU1_current;      // PSU1 current
-    uint16_t PSU1_temperature;  // PSU1 Temperature
-    uint16_t PSU1_line_voltage; // PSU1 Line voltage
-    uint8_t  PSU1_PSON_state;   // PSU1 power status
-    uint16_t PSU2_current;      // PSU2 current
-    uint16_t PSU2_temperature;  // PSU2 Temperature
-    uint16_t PSU2_line_voltage; // PSU2 Line voltage
-    uint8_t  PSU2_PSON_state;   // PSU2 power status
-};
-
 /**
  * @brief Initialise hardware 
  * 
@@ -151,15 +133,6 @@ uint16_t get_voltage( void );
 uint16_t get_current( void );
 
 /**
- * @brief Get the state of charge of the batteries
- * 
- * Gets the state of charge in Ah or percentage*100
- * @param type, see defines
- * @return uint16, the state of charge
- **/
-uint16_t get_SoC( uint8_t op_type );
-
-/**
  * @brief Get the PWM duty cycle
  * 
  * @param channel, PWM channel, see defines 
@@ -168,52 +141,4 @@ uint16_t get_SoC( uint8_t op_type );
  **/
 uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type );
 
-/**
- * @brief Get the state of the PSUs via I2C
- * 
- * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
- **/
-void get_psu_state(struct Inputs *ProcessControlInputs);
-
-/**
- * @brief Get PSU's current
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
- * @return uint16 the current flowing through of a PSU
- **/
-uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct);
-
-/**
- * @brief Get PSU's voltage
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
- * @return uint16 the line voltage of a PSU
- **/
-uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct);
-
-/**
- * @brief Get PSU's temperature
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param psu_struct, struct PSU_state, struct with the stored the PSU's states
- * @return uint16 the temperature of a PSU
- **/
-uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct);
-
-/**
- * @brief Power on or off a PSU
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param state, 0 turn off, 1 turn on, other turn off
- **/
 void psu_power(uint8_t psu_number, uint8_t state);
-
-/**
- * @brief Check the power state of a PSU in realtime.
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param state, 0 turn off, 1 turn on, other turn off
- **/
-uint8_t psu_power_check(uint8_t psu_number);
