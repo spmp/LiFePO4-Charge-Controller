@@ -15,13 +15,48 @@
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <util/delay.h>
-#include "hardware.h"
 #include "AVR-lib/lib/pid.h"
 #include "AVR-lib/usart.h"
 #include "AVR-lib/clock.h"
-#include "esp120.h"
+#include "BMScomms/BMScomms.h"
+#include "settings.h"
+#include "hardware.h"
 
-extern uint8_t PIDtype;
+/**
+ * @brief Defines for `calculate_outputs`
+ * 
+ * @def CHARGE_MODE_OFF                 Charging off/finished
+ * @def CHARGE_MODE_CONSTSANT_CURRENT   Constant current charging
+ * @def CHARGE_MODE_ABSORBTION          Absorbtion charge
+ * @def CHARGE_MODE_CONSTANT_VOLTAGE    Constand voltage charging
+ * 
+ * @def PID_MAX_OUTPUT                  Maximum PID output - essential max PWM value
+ * @def PID_CONSTANT_CURRENT_PROPORTION The proportion (P) for constant current PID
+ * 
+ * @def SETPOINT_REACHED_COUNT          The number of cycles with measurement above the setpoint
+ *                                      before it is considered `reached`
+ * @def PWM_THRESHOLD_REDUCTION         How much to reduce the PWM by if over threshold detected
+ **/
+
+// Charge modes
+#define CHARGE_MODE_OFF                 1
+#define CHARGE_MODE_CONSTANT_CURRENT    2
+#define CHARGE_MODE_INTERIM             9
+#define CHARGE_MODE_BALANCE             3
+#define CHARGE_MODE_CONSTANT_VOLTAGE    4
+#define CHARGE_MODE_CONSTANT_POWER      5
+#define CHARGE_MODE_ABSORBTION          6
+#define CHARGE_MODE_RETRY_WAIT          7
+#define CHARGE_MODE_OFF_ERROR           8
+
+#define PWM_THRESHOLD_REDUCTION         1000
+
+#define SETPOINT_REACHED_COUNT          4
+
+// LED Blinking
+#define LED_BLINK_PERIOD                10
+
+extern uint8_t ChargeMode;
 extern uint16_t cPIDmaxread;
 
 extern uint8_t begin_process_control_flag;
@@ -31,52 +66,60 @@ extern struct u_PID_DATA pidData_cv;     // PID data for constant voltage
 struct Inputs {
     uint16_t voltage;           // Voltage across the terminals in v*100
     uint16_t current;           // Current flowing through the controller in A*100
-    uint8_t  BMS_overvolt;      // Signal from the BMS that a battery is overvoltage
-    uint8_t  BMS_overtemp;      // Signal from the BMS that a battery is over temperature threshold
-    uint16_t battery_temp;      // Temperature of the hottest battery
-    struct ESP120AnalogData PSU1AnalogData;
-    uint8_t PSU1StatusReg;      // PSU1 Status Register
-    struct ESP120AnalogData PSU2AnalogData;
-    uint8_t PSU2StatusReg;      // PSU2 Status Register
+    uint16_t BMS_max_voltage;   // Signal from the BMS that a battery is overvoltage
+    uint8_t  BMS_balancing;     // Whether the BMS is balancing
+    uint8_t  BMS_status;      // Signal from the BMS that a battery is overvoltage
+    uint8_t  PSU1StatusReg;     // PSU1 Status Register
+    uint8_t  PSU2StatusReg;     // PSU2 Status Register
 };
 
 struct Outputs {
-    int16_t pwm_duty;          // Duty cycle of pwm_duty
+    int16_t  pwm_duty;          // Duty cycle of pwm_duty
     uint8_t  PSU_state;         // State of the PSU's
-    uint16_t Ah_count;          // How many Ah's have passed through the charger in this cycle. (Ahx100)
-    uint16_t charge_timer;      // How long have we been in the 'bulk' charging phase
-    uint16_t cur_rest_time;     // How long have we been resting?
-    uint16_t rest_timer;        // How long do we need to rest for?
-    uint16_t float_timer;        // How long do we need to float charge?
-    uint8_t  charge_state;      // State of charging; 0 not charging, 1 Bulk charging, 2 resting, 3 float charging,4 Done (examples), 7 stop - error
     uint8_t  error_code;        // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
-    uint8_t  charge_progress;   // Percentage of charging done.
+    uint8_t  charge_mode;
+    uint8_t  charge_retries;    // Numer of times we have retried charging
+    uint8_t  last_charge_mode;  // The charge mode that was in progress when error occured
+    uint32_t time_wait_retry;   // Time when retry wait is dones
+    uint8_t  led_green;         // Green LED
+    uint8_t  led_red;           // Red LED
 };
 
 struct Settings {
     uint8_t  program_number;    // An index for the process, such that process_control knows with process to run.
-    uint16_t current_max;       // Absolute maximum current. Shutdown if over
-    uint16_t current_threhold;  // Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
-    uint16_t current_charge;    // Current to charge the batteries at
-    uint16_t current_float;     // Max current for float charge
+    uint8_t  charge_retries_max;// Max number of times to try charging given stop conditions
+    // CC
+    uint16_t current_cc;        // Current to charge the batteries at
+    uint16_t voltage_cc;        // Voltage at which to switch to CV
+    uint16_t BMS_max_voltage_cc;// Maximum BMS voltage over which switch to CV
+    uint16_t pid_proportion_cc; // Proportional parameter for CC PID
+    // CV
+    uint16_t BMS_max_voltage_cv;// Maximum BMS voltage to track for CV charging
+    uint16_t voltage_cv;        // Voltage at which to kill CV charging
+    uint16_t current_cv;        // Max current for CV charge
+    uint16_t current_cv_done;   // Current below which CV stops and balancing charge starts
+    uint16_t pid_proportion_cv; // Proportional parameter for CV PID
+    uint16_t pid_proportion_cv_bms; // Proportion parameter for CV when reference is BMX_max_voltage
+    // Balancing
+    uint16_t BMS_max_voltage_balancing ;// Maximum BMS voltage to track for balance charging
+    uint16_t current_balancing; // Current to balance batteries at
+    uint16_t voltage_balancing; // Voltage at which to stop bulk charging
+    uint16_t pid_proportion_balancing; // Proportional parameter for CC PID
+    uint16_t pid_proportion_balancing_bms; // Proportion parameter for Balancing when reference is BMX_max_voltage
+    // Limits
+    uint16_t power_max;          // Power to charge the batteries at, whilst current below current_cp_max
+    uint16_t current_max;       // Absolute maximum current. Shutdown if over current_max and above current_charge
     uint16_t voltage_max;       // Absolute maximum battery voltage. Shutdown if over
-    uint16_t voltage_min;       // Minimum battery voltage. Error or batteries disconnected if under.
-    uint16_t voltage_threshold; // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
-    uint16_t voltage_charged;   // Voltage at which to stop bulk charging
-    uint16_t voltage_float;     // Voltage at which to float the batteries
-    uint16_t rest_time;         // Time between charged voltage and driving or float/done. This is in seconds per Ah
-    uint16_t max_PSU_temp;      // Maximum temperature for any PSU before shutdown
-    uint16_t max_PSU_volt;      // Maximum PSU line voltage
-    uint16_t min_PSU_volt;      // Minimum PSU voltage
+    uint16_t voltage_min;       // Minimum battery voltage. Error or batteries disconnected if under. voltage_max and above voltage_charged
     uint16_t max_battery_temp;  // Maximum temperature of any battery before shutdown.
     /** PID **/
-    int16_t PIDoutput;          // Output from the PID algorythm
-    int16_t cc_P_Factor;        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR
-    int16_t cc_I_Factor;        //! The cc Integral tuning constant, multiplied with SCALING_FACTOR
-    int16_t cc_D_Factor;        //! The cc Derivative tuning constant, multiplied with SCALING_FACTOR
-    int16_t cv_P_Factor;        //! The cv Proportional tuning constant, multiplied with SCALING_FACTOR
-    int16_t cv_I_Factor;        //! The cv Integral tuning constant, multiplied with SCALING_FACTOR
-    int16_t cv_D_Factor;        //! The cv Derivative tuning constant, multiplied with SCALING_FACTOR
+    int16_t PIDoutput;
+    /** Voltage calibration **/
+    float analog_voltage_offset_code;
+    float analog_voltage_slope_code;
+    /** Current calibration **/
+    float analog_current_offset_code;
+    float analog_current_slope_code;
 };
 
 struct Process {
@@ -151,11 +194,12 @@ void process_control_disable(void);
  **/
 void process_control(struct Process *process);
 
-
 /**
- * @brief Gravefully turn on the Power Supplies
+ * @brief Find the current setpoint given a current, a voltage, and a maximum current
  * 
- * @retval 0, Everything went well
- * @retval 1, OH dear, there was some error!
+ * @param power The desired power in Watts
+ * @param current_max The maximum current in A*100
+ * @param measured_voltage The measured voltage in V*100
+ * @return The currrent required to meet CP conditions
  **/
-// uint8_t turn_on_PSUs(struct Process *process )
+uint16_t cp_current_calc(uint16_t power_set, uint16_t current_max, uint16_t measured_voltage);

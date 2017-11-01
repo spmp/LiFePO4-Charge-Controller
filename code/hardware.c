@@ -13,10 +13,6 @@
  *****************************************************************************/
 #include "hardware.h"
 
-//Initialise the PSU_state
-// struct PSU_state psu_state = {0};
-
-
 /**
  * @brief Initialise hardware 
  * 
@@ -30,12 +26,13 @@ void init_hardware(void ) {
     init_clock();
     init_io_ports();
     init_usart(USART_BAUDE, F_CPU);
-    i2c_init(I2C_FREQ,F_CPU);
+    bmscomms_init_suart();
+    //softuart_init(4800);
     init_pwm(PWM_TOP, 1);
     set_pwm(1,PWM_START);
     WD_SET(WD_RST,WDTO_4S);
-    //Set B1 as output
-//     DDRB |= (1 << PIN1);
+    // Turn indicaor LED's off
+    led_indicators_set(LED_OFF, LED_OFF);
 }
 
 /**
@@ -48,20 +45,19 @@ void init_io_ports(void ) {
     //Set Internal LED pin to output
     DDRB |= (1 << ONBOARD_LED);
     //Set Green LED pin to output
-    DDRB |= (1 << GREEN_LED);
+    DDRB |= (1 << LED_GREEN);
     //Set Red LED pin to output
-    DDRB |= (1 << RED_LED);
+    DDRB |= (1 << LED_RED);
     
     //Set PSU1_ON pin to output
-    DDRD |= (1 << PSU1_ON);
+    PSU_ON_DDR |= (1 << PSU1_ON);
     //Set PSU2_ON pin to output
-    DDRD |= (1 << PSU2_ON);
+    PSU_ON_DDR |= (1 << PSU2_ON);
     
     //Set outputs OFF
-    PORTD &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
+    PSU_ON_PORT &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
     //Set Green LED ON
-    PORTB |= (1 << GREEN_LED);
-
+    LED_PORT |= (1 << LED_GREEN);
 }
 
 /**
@@ -73,40 +69,27 @@ void init_io_ports(void ) {
  * 
  * @return uint16, the corrected voltage in mV
  **/
-uint16_t get_voltage( void )
-{
-//     return read_ADC_pin_millivolts(0, VREF_INTERNAL);
-    return read_ADC_pin_millivolts(0, VenseADC_REF);
+uint16_t get_voltage(float slope, float offset){
+  float currentTmp = read_ADc_pin_linearFunc(V_SENSE_ADC_PIN, V_SENSE_ADC_REF, slope, offset);
+  if (currentTmp >= 0){
+    return currentTmp;
+  } else {
+    return 0;
+  }
 }
 
 /**
- * @brief Get the current flowing through the system
+ * @brief Get the current via analog sensor connected to pin A2/ADC2/PC2
  * 
- * @return uint16, the current in A*100
+ * @return uint16, the current in A*1000
  **/
-uint16_t get_current( void )
-{
-    return 20000;
-}
-
-
-/**
- * @brief Get the state of charge of the batteries
- * 
- * Gets the state of charge in Ah or percentage*100
- * @var type, see defines
- * @return uint16, the state of charge
- **/
-uint16_t get_SoC( uint8_t op_type )
-{
-    uint16_t soc = 531;
-    
-    if (!op_type){
-        return soc;
-    }
-    else {
-        return ((uint32_t)soc*100)/DESIGN_SOC;
-    }
+uint16_t get_analog_current(float slope, float offset){
+  float currentTmp = read_ADc_pin_linearFunc(A_SENSE_ADC_PIN, A_SENSE_ADC_REF, slope, offset);
+  if (currentTmp >= 0){
+    return currentTmp;
+  } else {
+    return 0;
+  }
 }
 
 /**
@@ -135,67 +118,6 @@ uint16_t get_pwm_duty( uint8_t pwm_chan, uint8_t op_type )
     }
 }
 
-
-/**
- * @brief Get the state of the PSUs via I2C
- * 
- * @param psu_struct, struct PSU_state, struct in which to store the PSU's states
- **/
-void get_psu_state(struct Inputs *ProcessControlInputs)
-{
-    //TODO: PSU State
-    esp120_analog_data(PSU1_ADDRESS, &ProcessControlInputs->PSU1AnalogData);
-//     *ProcessControlInputs->PSU1StatusReg = esp120_get_status_register(PSU1_ADDRESS);
-//     esp120_analog_data(PSU2_ADDRESS, &ProcessControlInputs->PSU2AnalogData);
-//     *ProcessControlInputs->PSU2StatusReg = esp120_get_status_register(PSU2_ADDRESS);
-}
-
-/**
- * @brief Get PSU's current
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- **/
-uint16_t get_psu_current( uint8_t psu_number, struct PSU_state *psu_struct)
-{
-    if (psu_number == 2 ) {
-        return psu_struct->PSU2_current;
-    }
-    else {
-        return  psu_struct->PSU1_current;
-    }
-}
-
-/**
- * @brief Get PSU's voltage
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- **/
-uint16_t get_psu_line_voltage( uint8_t psu_number, struct PSU_state *psu_struct)
-{
-    if (psu_number == 2 ) {
-        return psu_struct->PSU2_line_voltage;
-    }
-    else {
-        return  psu_struct->PSU1_line_voltage;
-    }
-}
-
-/**
- * @brief Get PSU's temperature
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- **/
-uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct)
-{
-    if (psu_number == 2 ) {
-        return psu_struct->PSU2_temperature;
-    }
-    else {
-        return  psu_struct->PSU1_temperature;
-    }
-}
-
-
 /**
  * @brief Power on or off a PSU
  * 
@@ -204,56 +126,62 @@ uint16_t get_psu_temperature( uint8_t psu_number, struct PSU_state *psu_struct)
  **/
 void psu_power(uint8_t psu_number, uint8_t state)
 {
-    //Send the I2R command to turn the PSU on
-    if (psu_number == 1 ) {
-        if (state == 1) {
-            //turn on
-            PSU_ON_PORT |= (1 << PSU1_ON);
-        }
-        else {
-            //turn off
-            PSU_ON_PORT &= ~(1 << PSU1_ON);
-        }
-    }
-    //Send the I2R command to turn the PSU on
-    else if (psu_number == 2 ) {
-        if (state == 1) {
-            //turn on
-            PSU_ON_PORT |= (1 << PSU2_ON);
-        }
-        else {
-            //turn off
-            PSU_ON_PORT &= ~(1 << PSU2_ON);
-        }
-    }
-    else {
-        if (state == 1 ){
-            //turn on both PSU's
-            PSU_ON_PORT |= ((1 << PSU1_ON) | (1 << PSU2_ON));
-        }
-        else {
-            //turn off both PSU's
-            PSU_ON_PORT &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
-        }
-    }
+  if (psu_number == 1 ) {
+      if (state == 1) {
+          //turn on
+          PSU_ON_PORT |= (1 << PSU1_ON);
+      }
+      else {
+          //turn off
+          PSU_ON_PORT &= ~(1 << PSU1_ON);
+      }
+  }
+  else if (psu_number == 2 ) {
+      if (state == 1) {
+          //turn on
+          PSU_ON_PORT |= (1 << PSU2_ON);
+      }
+      else {
+          //turn off
+          PSU_ON_PORT &= ~(1 << PSU2_ON);
+      }
+  }
+  else {
+      if (state == 1 ){
+          //turn on both PSU's
+          PSU_ON_PORT |= ((1 << PSU1_ON) | (1 << PSU2_ON));
+      }
+      else {
+          //turn off both PSU's
+          PSU_ON_PORT &= ~((1 << PSU1_ON) | (1 << PSU2_ON));
+      }
+  }
+}
+
+/** 
+ * @brief Set the indicator LED's to the given state, being on (LED_ON) or
+ * off (LED_OFF)
+ **/
+void led_indicators_set(uint8_t led_green, uint8_t led_red) {
+  if (led_green == LED_ON) {
+    bit_set(LED_PORT, BIT(LED_GREEN)); 
+  }
+  else
+  {
+    bit_clear(LED_PORT, BIT(LED_GREEN));
+  }
+  if (led_red == LED_ON) {
+    bit_set(LED_PORT, BIT(LED_RED)); 
+  }
+  else
+  {
+    bit_clear(LED_PORT, BIT(LED_RED));
+  }
 }
 
 /**
- * @brief Check the power state of a PSU in realtime.
- * 
- * @param psu_number, the number 1 or 2 of the PSU
- * @param state, 0 turn off, 1 turn on, other turn off
+ * @brief toggle the onboard LED
  **/
-uint8_t psu_power_check(uint8_t psu_number)
-{
-    //Send the I2R command to check psu state
-    if (psu_number == 1 ) {
-        //check state
-        return 0;
-    }
-    //Send the I2R command to turn the PSU on
-    if (psu_number == 2 ) {
-        //check state
-        return 0;
-    }
+void led_onboard_toggle() {
+  bit_flip(ONBOARD_LEDPort, BIT(ONBOARD_LED));
 }

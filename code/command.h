@@ -18,11 +18,9 @@
 #include <util/delay.h>
 #include "AVR-lib/usart.h"
 #include "AVR-lib/timers.h"
-#include "AVR-lib/i2c_safe.h"
 #include "hardware.h"
 #include "log.h"
 #include "process-control.h"
-#include "esp120.h"
 
 /* Key presses for serial interface */
 #define USART_KEY_LEVEL l

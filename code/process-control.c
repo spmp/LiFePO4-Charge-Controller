@@ -14,7 +14,7 @@
 #include "process-control.h"
 
 /**
- * @brief Variables that control whether the process_control is able to run (again)
+ * @brief Variables that control whether the process_control is running
  * 
  * @var begin_process_control_flag
  * Flag that indicates that process should run
@@ -23,12 +23,14 @@
  * @var process_control_enable
  * Flag for global enable/disable of process_control
  **/
-uint8_t PIDtype = 0;
-uint16_t cPIDmaxread = 30000;
 
 uint8_t begin_process_control_flag = 0;
 uint8_t process_control_running_flag = 0;
 uint8_t processControlEnable = 0;               //disabled by default
+
+// Variables used for indicator LED's
+uint8_t indicatorPosition = 0;
+uint8_t indicatorCounterRaw = 0;
 
 /**
  * @brief Variables used by the actual programmes running in calculate_outputs
@@ -41,13 +43,8 @@ uint8_t processControlEnable = 0;               //disabled by default
  * Allow us to run some stuff on the first rest
  * @var done_init_flag
  * Same as above
- * @def SETPOINT_REACHED_COUNT
- * How many counts of setpoint_reached_counter to count for
- * @def PWM_THRESHOLD_REDUCTION
- * How much to reduce the PWM by if we enounter an over threshold
  **/
-#define SETPOINT_REACHED_COUNT      50
-#define PWM_THRESHOLD_REDUCTION     1000
+
 uint8_t setpoint_reached_counter = 0;
 uint8_t rest_init_flag = 0;
 uint8_t done_init_flag = 0;
@@ -59,61 +56,57 @@ struct u_PID_DATA pidData_cc;    // PID data for constant current
 struct u_PID_DATA pidData_cv;    // PID data for constant voltage
 // = {   // PID data for constant voltage
 
-/** @brief struct PSU_state psu_state for storing PSU data **/
-struct PSU_state psu_state = {0};
-
 /** @brief struct Process process for program 1 **/
 struct Process process = {
-    {0},
-    {
-    .pwm_duty = PWM_START,          // Duty cycle of pwm_duty
-    .PSU_state = 20,         // State of the PSU's
-    .Ah_count = 0,          // How many Ah's have passed through the charger in this cycle
-    .charge_timer = 0,      // How long have we been in the 'bulk' charging phase
-    .cur_rest_time = 0,     // How long have we been resting?
-    .rest_timer = 0,        // How long do we need to rest for?
-    .float_timer = 0,        // How long do we need to float charge?
-    .charge_state = 0,      // State of charging, Bulk, rest, float, Done
-    .error_code = 0,         // Code of error that is encounted, will be set and cleared regularily - needs to be writtne to EEPROM somewhere
-    .charge_progress = 0    // Percentage of charging done.
-    },
-    {
-    .program_number = 1,     // An index for the process, such that process_control knows with process to run.
-    .current_max = 35000,     // Absolute maximum current. Shutdown if over
-    .current_threhold = 3500,// Current at which to try to recover over current condition, needs to be lower than current_max and above current_charge
-    .current_charge = 30000, // Current to charge the batteries at
-    .current_float = 20000, // Max current for float charge
-    .voltage_max = 1037,    // Absolute maximum battery voltage. Shutdown if over
-    .voltage_min = 8300,       // Minimum battery voltage. Error or batteries disconnected if under.
-    .voltage_threshold = 1035, // Voltage at which to try to recover over voltage condition, needs to be lower than voltage_max and above voltage_charged
-    .voltage_charged = 1013, // Voltage at which to stop bulk charging
-    .voltage_float = 942,   // Voltage at which to float the batteries
-    .rest_time = 36,         // Time between charged voltage and driving or float/done. This is in seconds per Ah
-    .max_PSU_temp = 70,      // Maximum temperature for any PSU before shutdown
-    .max_PSU_volt = 300,     // Maximum PSU line voltage
-    .min_PSU_volt = 200,     // Minimum PSU voltage
-    .max_battery_temp = 50,  // Maximum temperature of any battery before shutdown.
+  {0},
+  {
+    .pwm_duty = PWM_START,
+    .PSU_state = 20,
+    .error_code = 0,
+    .charge_mode = CHARGE_MODE_CONSTANT_CURRENT, // The initial charge mode
+    .charge_retries = 0,
+    .last_charge_mode = CHARGE_MODE_CONSTANT_CURRENT,
+    .time_wait_retry = 0,
+    .led_green = 0,
+    .led_red = 0
+  },
+  {
+    .program_number               = 1,
+    .charge_retries_max           = SETTINGS_CHARGE_RETRIES_MAX,
+    // CC
+    .current_cc                   = SETTINGS_CURRENT_CC,
+    .voltage_cc                   = SETTINGS_VOLTAGE_CC_CHARGED,
+    .BMS_max_voltage_cc           = SETTINGS_BMS_MAX_VOLTAGE_CC,
+    .pid_proportion_cc            = SETTINGS_PID_PROPORTION_CC,
+    // CV
+    .BMS_max_voltage_cv           = SETTINGS_BMS_MAX_VOLTAGE_CV,
+    .voltage_cv                   = SETTINGS_VOLTAGE_CV,
+    .current_cv                   = SETTINGS_CURRENT_CV,
+    .current_cv_done              = SETTINGS_CURRENT_CV_DONE,
+    .pid_proportion_cv            = SETTINGS_PID_PROPORTION_CV,
+    .pid_proportion_cv_bms        = SETTINGS_PID_PROPORTION_CV_BMS,
+    // Balancing
+    .BMS_max_voltage_balancing    = SETTINGS_BMS_MAX_VOLTAGE_BALANCING,
+    .current_balancing            = SETTINGS_CURRENT_BALANCING,
+    .voltage_balancing            = SETTINGS_VOLTAGE_BALANCING,
+    .pid_proportion_balancing     = SETTINGS_PID_PROPORTION_BALANCING,
+    .pid_proportion_balancing_bms = SETTINGS_PID_PROPORTION_BALANCING_BMS,
+    // Limits
+    .power_max                    = SETTINGS_POWER_MAX,
+    .current_max                  = SETTINGS_CURRENT_MAX,
+    .voltage_max                  = SETTINGS_VOLTAGE_MAX,
+    .voltage_min                  = SETTINGS_VOLTAGE_MIN,
+    .max_battery_temp             = SETTINGS_MAX_BATTERY_TEMP,
     /** PID **/
-    .PIDoutput = 0,          // Output from the PID algorythm
-    .cc_P_Factor = 1,        //! The cc Proportional tuning constant, multiplied with SCALING_FACTOR
-    .cc_I_Factor = 0,        //! The cc Integral tuning constant, multiplied with SCALING_FACTOR
-    .cc_D_Factor = 0,        //! The cc Derivative tuning constant, multiplied with SCALING_FACTOR
-    .cv_P_Factor = 3,        //! The cv Proportional tuning constant, multiplied with SCALING_FACTOR
-    .cv_I_Factor = 0,        //! The cv Integral tuning constant, multiplied with SCALING_FACTOR
-    .cv_D_Factor = 3         //! The cv Derivative tuning constant, multiplied with SCALING_FACTOR
-    }
+    .PIDoutput = 0,
+    /** Voltage calibration **/
+    .analog_voltage_offset_code   = ANALOG_VOLTAGE_HIGH_A_OFFSET_CODE,
+    .analog_voltage_slope_code    = ANALOG_VOLTAGE_HIGH_A_SLOPE_CODE,
+    /** Current calibration **/
+    .analog_current_offset_code   = ANALOG_CURRENT_OFFSET_CODE,
+    .analog_current_slope_code    = ANALOG_CURRENT_SLOPE_CODE
+  }
 };
-
-/** 
- * @brief Initialise the PID from Process struct
- * @param *process, a struct of type Process in which get the pid initialisation variables
- **/
-// void init_PID(struct Process *process)
-// {
-//     struct Settings *settings = &process->settings;
-//     u_pid_Init(settings->cc_P_Factor * SCALING_FACTOR, settings->cc_I_Factor * SCALING_FACTOR, settings->cc_D_Factor * SCALING_FACTOR, &pidData_cc);
-//     u_pid_Init(settings->cv_P_Factor * SCALING_FACTOR, settings->cv_I_Factor * SCALING_FACTOR, settings->cv_D_Factor * SCALING_FACTOR, &pidData_cv);
-// }
 
 /**
  * @brief Get the state of the system, input values and output states
@@ -121,462 +114,601 @@ struct Process process = {
  * @param *process, a struct of type Process in which to save the system state
  **/
 void get_state(struct Process *process) {
-    struct Inputs *inputs = &process->inputs;
-    struct Outputs *outputs = &process->outputs;
+  struct Inputs *inputs = &process->inputs;
+  struct Outputs *outputs = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  //inputs->current = read_ADC_pin(A_SENSE_ADC_PIN, A_SENSE_ADC_REF);
+  //inputs->current = get_analog_current(ANALOG_CURRENT_SLOPE_CODE, ANALOG_CURRENT_OFFSET_CODE);
+   inputs->current = get_analog_current(
+     settings->analog_current_slope_code,
+     settings->analog_current_offset_code
+   );
     
-    // Get the external states
-    get_psu_state(inputs);
-    inputs->current = (double)inputs->PSU1AnalogData.Current*1.2057067147 + 1811.45;
-    inputs->voltage = get_voltage();
-    
-    //Calculate Amp Hours assuming readings every 4th of a second
-    //Ah_QuarterSecond += inputs->current;
-    outputs->Ah_count += inputs->current/(60*60*10*4);
-    
-// //     inputs->current = (psu_state.PSU1_current+psu_state.PSU1_current)/2;
-    
-    // Get the internal states
-// //     outputs->pwm_duty = get_pwm_duty(PWM_CHAN_A, ABSOLUTE);
-//     outputs->charge_progress = get_SoC(ABSOLUTE);
+  // Get the voltage
+  //inputs->voltage = get_analog_current(ANALOG_CURRENT_SLOPE_CODE, ANALOG_CURRENT_OFFSET_CODE);
+  //inputs->voltage = read_ADC_pin(A_SENSE_ADC_PIN, A_SENSE_ADC_REF);
+  inputs->voltage = get_voltage(
+    settings->analog_voltage_slope_code,
+    settings->analog_voltage_offset_code
+  );
+  
+  // Get BMS status
+  bmscomms_find_and_process_packet(&inputs->BMS_max_voltage, &inputs->BMS_status, &inputs->BMS_balancing);
+  
+}
+
+/**
+ * @brief Enable and power up the PSU output
+ * 
+ * @param *process Process Struct
+ **/
+void psu_enable(struct Process* process)
+{
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  // Set the duty cycle to safe start condition
+  outputs->pwm_duty = PWM_START;
+  // Start the PSU's
+  psu_power(3,1);
+  // Note that we have started the psu's
+  startPSUflag = 1;
+  // Wait a bit
+  _delay_ms(500);
+}
+/**
+ * @brief Disable and power down the PSU outputs
+ * 
+ * @param *process Process Struct
+ **/
+void psu_disable(struct Process* process)
+{
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  // Set the duty cycle and PIDOutput to safe start condition
+  outputs->pwm_duty = PWM_START;
+  settings->PIDoutput = 0;
+  // Stop the PSU's
+  psu_power(3,0);
+  // Note that we have stopped the PSU's
+  startPSUflag = 0;
+}
+
+
+/**
+ * @brief Find the current setpoint given a current, a voltage, and a maximum current
+ * 
+ * @param power The desired power in Watts
+ * @param current_max The maximum current in A*1000
+ * @param measured_voltage The measured voltage in V*10
+ * @return The currrent required to meet CP conditions
+ **/
+uint16_t cp_current_calc(uint16_t power_set, uint16_t current_max, uint16_t measured_voltage)
+{
+  return min(
+    // Power is in Watts (VA), whereas voltage is V*10, and current is in A*1000, must multiply by 10,000
+    // IE V = 100x10 = 1,000, C = 20*1000 = 20,000, P = 20,000,000, P' = 2000 * 1000
+    ((uint32_t)power_set*10000)/measured_voltage,
+    current_max
+  );
 }
 
 /**
  * @brief Calculate the outputs in order to controll the process
+ *
+ * The process-control is primarily calculating outputs.
+ * This process is broken up as follows:
+ *   - Check `outputs->charge_mode' and calculate outputs accordingly
+ *   - Check the calculated outputs are reasonable, adjust if nesc.
+ *   - Set the outputs to calculated values
+ *   - Log every second and respond to serial commands
  * 
- * Details are elsewhere and in code.
+ *   Charging the batteries follows the follows the following stages
+ *   1. Constant current charge (CHARGE_MODE_CONSTSANT_CURRENT)
+ *      Charge at a constant current (settings->current_charge) until the
+ *      input voltage (inputs->voltage) reaches the setpoint
+ *      (settings->voltage_charged)
+ *   2. Absorbtion charge (CHARGE_MODE_ABSORBTION)
+ *      No charging for a multiple of the constant current charge time
+ *   3. Constant voltage charge (CHARGE_MODE_CONSTANT_VOLTAGE)
+ *      Charge at a constant voltage (settings->voltage_float) for a multiple
+ *      of the constant current charge time, whilst ensuring the current does
+ *      not exceed settings->current_float
+ *
  * 
- * @param *process, a struct of type Process in which to save the system state
+ * @param *process a struct of type Process in which to save the system state
  **/
 void calculate_outputs(struct Process* process)
 {
-    
-    struct Inputs *inputs = &process->inputs;
-    struct Outputs *outputs = &process->outputs;
-    struct Settings *settings = &process->settings;
-   
-//     outputs->Ah_count = u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
-//     outputs->pwm_duty += (int32_t)(outputs->Ah_count/8);
-//      u_pid_Controller(settings->voltage_charged, inputs->voltage, &pidData_cv);
-//     pid_proportional( int32_t Measured, int32_t setPoint, int32_t MeasuredMax, int32_t OutputMax, float Proportionality, uint8_t Power);
-    
-/*
- * The process-control is primarily calculating outputs. This process is broken up as follows:
- *   Check if any maximum conditions (current and voltage) are breached and shutdown if so.
- *     The `PIDtype' sets the stage of the charging and is inspected by the switch/case statement.
- *     The `PIDtype's are:
- *       0 Stop. Stop charging, power off PSU's
- *       1 Constant current (startup default). Bulk charging at settings->current_charge, until settings->voltage_charged is reached
- *       2 Absorbtion. This stage waits for a period of time defined by the battery manufacturer
- *       3 Constant voltage: A constant voltage is maintained for a further time period.
- */
-    if( (inputs->voltage >= settings->voltage_max) || (inputs->current >= settings->current_max)) {
-//             send_string_p(PSTR("OUTputs out of bounds, quitting PID/r/n"));
-            settings->PIDoutput = 0;
-            outputs->pwm_duty = PWM_START;
-            //Turn off the PSU's
-            psu_power(3,0);
-            PIDtype = 0;
+  struct Inputs   *inputs   = &process->inputs;
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  switch(outputs->charge_mode) {
+    //Constant Current PID
+    case CHARGE_MODE_CONSTANT_CURRENT:
+      //Check if the voltage set point has been reached - then cv charge
+      if ( inputs->voltage >= settings->voltage_cc ||
+        inputs->BMS_max_voltage >= settings->BMS_max_voltage_cv ||
+        inputs->BMS_balancing >= BMSCOMMS_BALANCE_SOME
+      ) {
+        
+        // Check if the setpoint has been reached enough times
+        setpoint_reached_counter++;
+        if ( setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
+        {
+          //Reset setpoint counter
+          setpoint_reached_counter = 0;
+          //Change to CHARGE_MODE_CONSTANT_VOLTAGE
+          settings->analog_voltage_slope_code = ANALOG_VOLTAGE_LOW_A_SLOPE_CODE;
+          settings->analog_voltage_offset_code = ANALOG_VOLTAGE_LOW_A_OFFSET_CODE;
+          outputs->charge_mode = CHARGE_MODE_CONSTANT_VOLTAGE;
+          break;
+        }
+      } else {
+      // Setpoint is not reached.
+        // Decriment the setpoint counter
+        if ( setpoint_reached_counter > 0 ) 
+        {
+          setpoint_reached_counter--;
+        }
+      }
+        
+        //If the PSU's are not on/started they must be started/turned-on.
+        if(!startPSUflag)
+        {
+          psu_enable(process);
         }
         
-    else {
-           
-        switch(PIDtype) {
-            case 1: //Constant Current PID
-                //Check if the voltage set point has been reached.
-                if (inputs->voltage >= settings->voltage_charged ){
-                    //TODO: Impliment a decriment of this counter ie.. setpoint+5, then in the main body setpoint- such that the setpoints must me reached sequentially.
-                    setpoint_reached_counter++;
-                    if (setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
-                    {
-                        //Turn off the PSU's
-                        outputs->pwm_duty = PWM_START;
-                        settings->PIDoutput = 0;
-                        psu_power(3,0);
-                        startPSUflag = 0;
-                        // Calculate how long to wait.
-                        outputs->rest_timer = timestamp*2;
-                        outputs->float_timer = timestamp*3;
-                        //Reset setpoint counter
-                        setpoint_reached_counter = 0;
-                        //FInish Cahrging here
-                        //PIDtype = 0;
-                        //Change to Waiting
-                        PIDtype = 2;
-                        break;
-                    }
-                }
-                // Setpoint is not reached.
-                else 
-                    //If the PSU's are not on/started they must be started/turned-on.
-                    if(!startPSUflag)
-                    {
-                        //Start the PSU
-                        outputs->pwm_duty = PWM_START;
-                        psu_power(3,1);
-                        startPSUflag = 1;
-                        _delay_ms(500);
-                    }
-                    //Constant current PID
-                    settings->PIDoutput = pid_proportional_current( inputs->current, settings->current_charge, 300, 25);
-                break;
-                
-            case 2:
-                //wait
-                //TODO: Change light blinking pattern
-                if (timestamp >= outputs->rest_timer)
-                {
-                    PIDtype =3;
-                }
-                break;
-                
-            case 3:
-                //Constant Voltage PID
-                if (timestamp >= outputs->float_timer)
-                {
-                    //ensure output returned to safe state
-                    outputs->pwm_duty = PWM_START;
-                    settings->PIDoutput = 0;
-                    //Turn off the PSU's
-                    psu_power(3,0);
-                    startPSUflag = 0;
-                    //Change to Done..
-                    PIDtype = 0;
-                    break;
-                }
-                else
-                    if(!startPSUflag)
-                    {
-                        //Start the PSU
-                        outputs->pwm_duty = PWM_START;
-                        outputs->pwm_duty = PWM_START;
-                        psu_power(3,1);
-                        startPSUflag = 1;
-                        _delay_ms(1000);
-                    }
-                    if( inputs->current >= settings->current_float )
-                    {
-                        settings->PIDoutput = pid_proportional_current( inputs->current, settings->current_float, 300, 25);
-                    }
-                    else
-                    {
-                        settings->PIDoutput = pid_proportional_max( inputs->voltage, settings->voltage_float, 1100, 0xFFF, 0.25, 1, 30);
-                    }
-                break;
-            default:
-                //Turn off the PSU's
-                outputs->pwm_duty = PWM_START;
-                settings->PIDoutput = 0;
-                psu_power(3,0);
-                startPSUflag = 0;
-                PIDtype = 0;
+        //Constant current PID
+        settings->PIDoutput = pid_proportional_simple(
+          // Measured value
+          inputs->current,
+          // Set point
+          settings->current_cc,
+          // (P)roportion
+          settings->pid_proportion_cc,
+          // Maximum output value
+          SETTINGS_PID_MAX_CC
+        );
+      break;
+      
+    // Constant Voltage PID
+    // Charge at the voltage of the highest cell - just below Balance voltage
+    // Stop when a cell is balancing
+    case CHARGE_MODE_CONSTANT_VOLTAGE:
+      // Check if constant voltage charge stage has been going long enough
+      if ( inputs->current <= settings->current_cv_done ||
+            inputs->voltage >= settings->voltage_cv ||
+            inputs->BMS_balancing >= BMSCOMMS_BALANCE_SOME ) 
+      {        
+        // Check if the setpoint has been reached enough times
+        setpoint_reached_counter++;
+        
+        if ( setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
+        {
+          //Turn off the PSU's and set the next stage
+          psu_disable(process);
+          //Reset setpoint counter
+          setpoint_reached_counter = 0;
+          //Change to CHARGE_MODE_ABSORBTION
+          outputs->charge_mode = CHARGE_MODE_BALANCE;
+          break;
         }
-    
+      }
+      else 
+      {
+        //If the PSU's are not on/started they must be started/turned-on.
+        if(!startPSUflag)
+        {
+          //Start the PSU
+          psu_enable(process);
+        }
+        
+        // Check if the current is greater than the float current
+        if( inputs->current >= settings->current_cv )
+        {
+          settings->PIDoutput = pid_proportional_simple(
+            // Measured value
+            inputs->current,
+            // Set point
+            settings->current_cv,
+            // (P)roportion
+            settings->pid_proportion_cc,
+            // Maximum output value
+            SETTINGS_PID_MAX_CC
+          );
+        } else {
+          settings->PIDoutput = pid_proportional_simple(
+            // Measured value
+            inputs->BMS_max_voltage,
+            // Set point
+            settings->BMS_max_voltage_cv,
+            // Proportional
+            settings->pid_proportion_cv_bms,
+            // Output Max
+            SETTINGS_PID_MAX_CV_BMS
+          );
+        }
+        break;
+      }
+      
+    case CHARGE_MODE_BALANCE: //Constant Current PID
+      //Check if cells have finished balancing or the voltage set point has been reached.
+      // We detect not balancing as the balancing output turns off when all cells are done
+      if ( inputs->BMS_balancing >= BMSCOMMS_BALANCE_ALL || inputs->voltage >= settings->voltage_balancing) {
+        
+        // Check if the setpoint has been reached enough times
+        setpoint_reached_counter++;
+        if ( setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
+        {
+          //Turn off the PSU's and set the next stage
+          psu_disable(process);
+          //Reset setpoint counter
+          setpoint_reached_counter = 0;
+          //Change to CHARGE_MODE_ABSORBTION
+          outputs->charge_mode = CHARGE_MODE_OFF;
+          break;
+        }
+      } else {
+      // Setpoint is not reached.
+        // Decriment the setpoint counter
+        if ( setpoint_reached_counter > 0 ) 
+        {
+          setpoint_reached_counter--;
+        }
+      }
+      //If the PSU's are not on/started they must be started/turned-on.
+      if(!startPSUflag)
+      {
+        psu_enable(process);
+      }
+      
+      // Check if the current is greater than the float current
+      if( inputs->BMS_max_voltage >= settings->BMS_max_voltage_balancing )
+      {
+        settings->PIDoutput = pid_proportional_simple(
+          // Measured value
+          inputs->BMS_max_voltage,
+          // Set point
+          settings->BMS_max_voltage_balancing,
+          // Proportional
+          settings->pid_proportion_balancing_bms,
+          // Output Max
+          SETTINGS_PID_MAX_BALANCING_BMS
+        );
+      } else {
+      //Constant current PID
+      settings->PIDoutput = pid_proportional_simple(
+        // Measured value
+        inputs->current,
+        // Set point
+        settings->current_balancing,
+        // (P)roportion
+        settings->pid_proportion_balancing,
+        // Maximum output value
+        SETTINGS_PID_MAX_BALANCING
+      );
+      }
+      break;
+      
+          case CHARGE_MODE_ABSORBTION: //Constant Current PID
+      //Check if cells have finished balancing or the voltage set point has been reached.
+      // We detect not balancing as the balancing output turns off when all cells are done
+      if ( inputs->voltage >= settings->voltage_balancing) {
+        
+        // Check if the setpoint has been reached enough times
+        setpoint_reached_counter++;
+        if ( setpoint_reached_counter >= SETPOINT_REACHED_COUNT )
+        {
+          //Turn off the PSU's and set the next stage
+          psu_disable(process);
+          //Reset setpoint counter
+          setpoint_reached_counter = 0;
+          //Change to CHARGE_MODE_ABSORBTION
+          outputs->charge_mode = CHARGE_MODE_OFF;
+          break;
+        }
+      }  else {
+      // Setpoint is not reached.
+        // Decriment the setpoint counter
+        if ( setpoint_reached_counter > 0 ) 
+        {
+          setpoint_reached_counter--;
+        }
+      }
+      //If the PSU's are not on/started they must be started/turned-on.
+      if(!startPSUflag)
+      {
+        psu_enable(process);
+      }
+      
+      //Constant current PID
+      settings->PIDoutput = pid_proportional_simple(
+        // Measured value
+        inputs->current,
+        // Set point
+        settings->current_balancing,
+        // (P)roportion
+        settings->pid_proportion_balancing,
+        // Maximum output value
+        SETTINGS_PID_MAX_BALANCING
+      );
+      break;
+      
+    case CHARGE_MODE_RETRY_WAIT:
+    {
+      // Check if we have waited long enough to try again
+      if ( timestamp >= outputs->time_wait_retry )
+      {
+        outputs->charge_mode = outputs->last_charge_mode;
+      }
     }
- 
-    
-    //Check PWM output --> Inverted (ie high = low output so use -= )
-    outputs->pwm_duty -= settings->PIDoutput;
-    //settings->PIDoutput = 0;
-    // Maintain PWM Limits/Boundaries
-    if (outputs->pwm_duty >= PWM_TOP-1){
-        outputs->pwm_duty = PWM_TOP-2;
+    default:
+    {
+      //Turn off the PSU's
+      psu_disable(process);
     }
-    if (outputs->pwm_duty <= 0){
-        outputs->pwm_duty = 0;
-    }
-//     if (outputs->pwm_duty >= 550){
-//         outputs->pwm_duty = 550;
-//     }
-    
-// // // //     /** The actual process control is as follows: **/
-// // // //     
-// // // //     /** Which 'program' are we running? **/
-// // // //     switch(settings->program_number) {
-// // // //         
-// // // //         //We only have one program at the moment, so as a catchall lets do:
-// // // //         default:
-// // // //             /** Where are we in the charging cycle? **/
-// // // //             switch(outputs->charge_state) {
-// // // //                 // Not charging
-// // // //                 case 0:
-// // // //                     /** 
-// // // //                      * @brief Transition from not charging to charging
-// // // //                      * 
-// // // //                      * We assume that we are not charging because the process
-// // // //                      * has just begun in which case we must make sure that it is
-// // // //                      * safe to begin to charge as such we need to:
-// // // //                      * -# Check the battery voltage
-// // // //                      *  - if it is high, then charging is done
-// // // //                      *  - if it low then there is an error and we need to stop immediatly
-// // // //                      * -# Reduce the ouput signal to a safe level
-// // // //                      * -# Check the state of the PSU's
-// // // //                      *  - Temperature
-// // // //                      *  - Line voltage
-// // // //                      *  If all is fine progress, otherwie fire an error and stop
-// // // //                      * -# Power on the PSU's
-// // // //                      *  - Check status, if all is fine progress, or error otherwise
-// // // //                      * -# Set the charge_state to bulk
-// // // //                      * NOTE no need to break at the end of any of these routines!
-// // // //                      **/
-// // // //                     if (inputs->voltage >= settings->voltage_float) {
-// // // //                         //Batteries are already charged
-// // // //                         outputs->charge_state = 4;      //Charging done
-// // // //                         break;
-// // // //                     }
-// // // //                     if (inputs->voltage <= settings->voltage_min) {
-// // // //                         //Batteries are not connected or there is  problem
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 1;        //Battery undervolt!
-// // // //                         break;
-// // // //                     }
-// // // //                         //Set PWM to minimum
-// // // //                     set_pwm(PWM_CHAN_A, PWM_START);
-// // // //                     if (get_pwm_duty(PWM_CHAN_A,ABSOLUTE) != PWM_START) {
-// // // //                         //PWM failed to be set so the process is doomed
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 2;        //PWM Set Error
-// // // //                         break;
-// // // //                     }
-// // // //                         //Check PSU states
-// // // //                     if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
-// // // //                         //One of the PSU's is over temperatur
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 3;        //PSU temperature error
-// // // //                         break;
-// // // //                     }
-// // // //                     if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
-// // // //                         //One of the PSU's is over or under voltage
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 4;        //PSU voltage error
-// // // //                         break;
-// // // //                     }
-// // // //                     //Turn on the PSU's
-// // // //                     psu_power(1,1);
-// // // //                     psu_power(2,1);
-// // // //                     _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
-// // // //                     if (!psu_power_check(1) || !psu_power_check(2)) {
-// // // //                         //Something went wrong! PSU's have not powered on
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 5;        //PSU PSON error
-// // // //                         break;
-// // // //                     }
-// // // //                     
-// // // //                         // OK, its all done, we can progress!
-// // // //                     outputs->charge_state = 2;
-// // // // 
-// // // //                         
-// // // //                 //Bulk charging
-// // // //                 case 1:
-// // // //                     /**
-// // // //                      * @brief Manage the bulk charging, this is constant current (cc) up to a setpoint
-// // // //                      * 
-// // // //                      * We assume that the PSU's are on and everything is OK
-// // // //                      * -# Check voltage
-// // // //                      *  - If low progress
-// // // //                      *  - If at or above setpoint add to setpoint reached counter
-// // // //                      *  - If the setpoint counter is big enough increase charge_state to Rest
-// // // //                      * -# Run PID for cc control to setpoint 
-// // // //                      * -# check for current and voltage above _threshold
-// // // //                      *  - if so apply standard reduction to current control parameter
-// // // //                      * -# incriment Ah
-// // // //                      **/
-// // // //                     // Check voltages
-// // // //                     if (inputs->voltage >= settings->voltage_charged){
-// // // //                         setpoint_reached_counter++;
-// // // //                         // Has charging really finished?
-// // // //                         if (setpoint_reached_counter >= SETPOINT_REACHED_COUNT ) {
-// // // //                             // OMG we are done bulk charging
-// // // //                             outputs->charge_state = 2;
-// // // //                         }
-// // // //                     }
-// // // //                     
-// // // //                     /** 
-// // // //                      * @brief This is where most of the MAGIC happens, and where things can go horrible wrong!
-// // // //                      * 
-// // // //                      * PID PID PID PID
-// // // //                      * Personally I think that we CANNOT use the I term due to the cumulative error as the chargers are below the battery voltage
-// // // //                      *  Divisors, gain terms, oscillation!
-// // // //                      * 
-// // // //                      * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
-// // // //                      **/
-// // // //                     outputs->pwm_duty -= u_pid_Controller(settings->current_charge, inputs->current, &pidData_cc)/4;
-// // // //                     
-// // // //                     // Check if over _thresholds
-// // // //                     if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
-// // // //                         //OMG reduce the PWM!
-// // // //                         outputs->pwm_duty += PWM_THRESHOLD_REDUCTION;
-// // // //                     }
-// // // //                     
-// // // //                     // Incdriment Ah
-// // // //                     outputs->Ah_count += inputs->current;
-// // // //                     
-// // // //                 //Rest
-// // // //                 case 2:
-// // // //                     /**
-// // // //                      * @brief Intiate a rest time based on the Ah into the battery
-// // // //                      * 
-// // // //                      * We assume that bulk charging is complete
-// // // //                      * -# Run once on rest
-// // // //                      *  - gracefully reduce PWM
-// // // //                      *  - Power down the PSU's (checking they do)
-// // // //                      *  - Initialise rest counter (Will be large)
-// // // //                      * -# reduce rest counter, possibly every seconds
-// // // //                      * -# When rest counter is done progress to Float charge
-// // // //                      **/
-// // // //                     // Do stuff on the first running
-// // // //                     if (!rest_init_flag) {
-// // // //                         //Power down the PSU's
-// // // //                         outputs->pwm_duty = PWM_START;
-// // // //                         psu_power(1,0);
-// // // //                         psu_power(2,0);
-// // // //                         
-// // // //                         /**
-// // // //                          * @brief  Calculate rest time in _medium_ time periods of a seconds
-// // // //                          *  Batteries specified as 1 hour per 100Ah.
-// // // //                          * Which is 1*(60*60/100) = 36 seconds per Ah.
-// // // //                          * Which is 180 _medium_ timesteps per Ah.
-// // // //                          * Now we are storing Ah as Amps . 1/5th of a second
-// // // //                          * So want seconds so we need to divide Ah by 180
-// // // //                          *  MY MATH IS ALL WRONG!
-// // // //                          **/
-// // // //                         outputs->rest_timer = outputs->Ah_count / settings->rest_time ;
-// // // //                         
-// // // //                         //Set the rest_init_flag so we dont do this again
-// // // //                         rest_init_flag = 1;
-// // // //                     }
-// // // //                     
-// // // //                     //Decriment the rest timer
-// // // //                     outputs->rest_timer --;
-// // // //                     
-// // // //                     if (!outputs->rest_timer) {
-// // // //                         //Done resting
-// // // //                         outputs->charge_state = 3;
-// // // //                     }
-// // // //                         
-// // // //                 //Constant voltage
-// // // //                 case 3:
-// // // //                     /** 
-// // // //                      * @brief Constant voltage charging
-// // // //                      * 
-// // // //                      * We assume that bulk and rest charging has been done.
-// // // //                      * -# set PWM output low, and go through the same startup sequence as in Bulk
-// // // //                      * -# Check current, it must be below current setpoint
-// // // //                      *  - What to do if it is not?
-// // // //                      * -# Check voltage limits
-// // // //                      *  - Do stuff
-// // // //                      * -# Run PID on voltage
-// // // //                      * -# Check for voltage above voltage_charged
-// // // //                      *  - Take action if it is over
-// // // //                      * -# @todo: How do we determine when float should finish?
-// // // //                      **/
-// // // //                         //Set PWM to minimum
-// // // //                     set_pwm(PWM_CHAN_A,PWM_START);
-// // // //                     if (get_pwm_duty(PWM_CHAN_A,ABSOLUTE) != PWM_START) {
-// // // //                         //PWM failed to be set so the process is doomed
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 2;        //PWM Set Error
-// // // //                         break;
-// // // //                     }
-// // // //                         //Check PSU states
-// // // //                     if ( psu_state.PSU1_temperature >= settings->max_PSU_temp || psu_state.PSU2_temperature >= settings->max_PSU_temp ) {
-// // // //                         //One of the PSU's is over temperatur
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 3;        //PSU temperature error
-// // // //                         break;
-// // // //                     }
-// // // //                     if (psu_state.PSU1_line_voltage >= settings->max_PSU_volt || psu_state.PSU1_line_voltage < settings->min_PSU_volt || psu_state.PSU2_line_voltage >= settings->max_PSU_volt || psu_state.PSU2_line_voltage < settings->min_PSU_volt) {
-// // // //                         //One of the PSU's is over or under voltage
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 4;        //PSU voltage error
-// // // //                         break;
-// // // //                     }
-// // // //                     //Turn on the PSU's
-// // // //                     psu_power(1,1);
-// // // //                     psu_power(2,1);
-// // // //                     _delay_ms(5);                       //Delay as we wait for the power supplies to turn on
-// // // //                     if (!psu_power_check(1) || !psu_power_check(2)) {
-// // // //                         //Something went wrong! PSU's have not powered on
-// // // //                         outputs->charge_state = 7;      //Charging error
-// // // //                         outputs->error_code = 5;        //PSU PSON error
-// // // //                         break;
-// // // //                     }
-// // // //                     
-// // // //                     //All good, now we can do Float charging for... ever...
-// // // //                     
-// // // //                     /** 
-// // // //                      * @brief This is where most of the MAGIC happens, and where things can go horrible wrong!
-// // // //                      * 
-// // // //                      * PID PID PID PID
-// // // //                      * Personally I think that we CANNOT use the I term due to the cumulative error as the chargers are below the battery voltage
-// // // //                      *  Divisors, gain terms, oscillation!
-// // // //                      * 
-// // // //                      * Another approach may be to have a set voltage or current in which we kick over into another PID mode, like low and high so that we can use I to reduce oscillation.
-// // // //                      **/
-// // // //                     outputs->pwm_duty -= u_pid_Controller(settings->voltage_float, inputs->voltage, &pidData_cv)/4;
-// // // //                     
-// // // //                     // Check if over _thresholds
-// // // //                     if ( inputs->current >= settings->current_threhold || inputs->voltage >= settings->voltage_threshold ) {
-// // // //                         //OMG reduce the PWM!
-// // // //                         outputs->pwm_duty += PWM_THRESHOLD_REDUCTION;
-// // // //                     }
-// // // //                     
-// // // //                     // Incdriment Ah
-// // // //                     outputs->Ah_count += inputs->current;
-// // // //                     
-// // // //                     
-// // // //                 // Done
-// // // //                 case 4:
-// // // //                     /**
-// // // //                      * @brief the charging is done or has been prematurely stopped.
-// // // //                      * 
-// // // //                      * We assume nothing except we need charging to stop fairly rapidly
-// // // //                      * -# Reduce PWM
-// // // //                      * -# Power off PSU's
-// // // //                      * -# Reset all counters - NO we will do that on start!
-// // // //                      * -# Make notes or whatever. - Whatever!
-// // // //                      **/
-// // // //                     // Do stuff on the first running
-// // // //                     if (!done_init_flag) {
-// // // //                         //Power down the PSU's
-// // // //                         outputs->pwm_duty = PWM_START;
-// // // //                         psu_power(1,0);
-// // // //                         psu_power(2,0);
-// // // //                     
-// // // //                         //We are done, just uselessly loop through from now on
-// // // //                         done_init_flag = 1;
-// // // //                     }
-// // // //                     
-// // // //                     break;
-// // // //             }
-// // // //     
-// // // //     }
+  }
+  
+  //Invert PWM output is inverted, so we decrement it with PIDoutput
+  outputs->pwm_duty -= settings->PIDoutput;
+  // Maintain PWM Limits/Boundaries
+  if ( outputs->pwm_duty >= PWM_TOP-1 )
+  {
+    outputs->pwm_duty = PWM_TOP-2;
+  }
+  if ( outputs->pwm_duty <= 0 )
+  {
+    outputs->pwm_duty = 0;
+  }
 }
 
+void handle_retries(struct Process* process)
+{
+  struct Inputs   *inputs   = &process->inputs;
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  // First lets turn it all off
+  psu_disable(process);
+  outputs->charge_mode = CHARGE_MODE_OFF_ERROR;
+  
+//   // Check number of retries
+//   if ( outputs->charge_retries >= settings->charge_retries_max ) 
+//   {
+//     // We are done
+//     send_string_p(PSTR("Maximum number of retries reached, aborting...\r\n"));
+//     outputs->charge_mode = CHARGE_MODE_OFF_ERROR;
+//   }
+//   else
+//   {
+//     // Incriment retries
+//     outputs->charge_retries++;
+//     // Set the charge mode to CHARGE_MODE_RETRY_WAIT
+//     outputs->charge_mode = CHARGE_MODE_RETRY_WAIT;
+//     // Set the retry wait time
+//     outputs->time_wait_retry = timestamp + SETTINGS_CHARGE_RETRY_WAIT_TIME;
+//   }
+}
+  
 /**
- * @brief Check that no inputs or propoesd outputs will break anything
+ * @brief Check that no inputs or proposed outputs will break anything
  * 
  * @param *process, a struct of type Process in which to save the system state
  **/
 void check_limits(struct Process* process)
 {
-    struct Inputs *inputs = &process->inputs;
-    struct Outputs *outputs = &process->outputs;
-    struct Settings *settings = &process->settings;
-    
+  struct Inputs   *inputs   = &process->inputs;
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+ 
+  // Initialise static bms_error_count
+  static uint8_t bms_error_count = 0;
+  if (bms_error_count > 0 ) bms_error_count--;
+
+  uint8_t halt = 0;
+  
+  if (outputs->charge_mode != CHARGE_MODE_OFF_ERROR){
     //Check if any of the stop conditions are reached.
-    if((inputs->current >= settings->current_max) || (inputs->voltage >= settings->voltage_max))
-    {
-        //ensure output returned to safe state
-        outputs->pwm_duty = PWM_START;
-        settings->PIDoutput = 0;
-        //Turn off the PSU's
-        psu_power(3,0);
-        startPSUflag = 0;
-        //Change to Done..
-        PIDtype = 0;
-        send_string_p(PSTR("A stop condition was breached. Shutting down.\r\n"));
+    if (inputs->current >= settings->current_max) {
+      halt++;
+      send_string_p(PSTR("Over current!"));
+      send_newline();
     }
+    if (inputs->voltage >= settings->voltage_max) {
+      halt++;
+      send_string_p(PSTR("Over voltage!"));
+      send_newline();
+    }
+//     if (inputs->voltage <= settings->voltage_min) {
+//       halt++;
+//       send_string_p(PSTR("Under voltage!"));
+//       send_newline();
+//     }
+    if (inputs->BMS_status != BMSCOMMS_STATUS_OK &&
+        ++bms_error_count >= SETTINGS_BMSCOMMS_ERROR_COUNT) {
+      if (inputs->BMS_status == BMSCOMMS_STATUS_FAULT) {
+        halt++;
+        send_string_p(PSTR("BMS comms fault!"));
+        send_newline();
+      }
+      if (inputs->BMS_status == BMSCOMMS_STATUS_OVER_VOLTAGE) {
+        halt++;
+        send_string_p(PSTR("BMS battery over voltage!"));
+        send_newline();
+      }
+      if (inputs->BMS_status == BMSCOMMS_STATUS_OVER_TEMP) {
+        halt++;
+        send_string_p(PSTR("BMS battery over temperature!"));
+        send_newline();
+      }
+      if (inputs->BMS_status == BMSCOMMS_STATUS_UNDER_VOLTAGE) {
+        halt++;
+        send_string_p(PSTR("BMS battery under voltage!"));
+        send_newline();
+      }
+      if (inputs->BMS_status > BMSCOMMS_STATUS_UNDER_VOLTAGE) {
+        halt++;
+        send_string_p(PSTR("BMS unknown fault!"));
+        send_newline();
+      }
+    }
+    if(halt != 0){
+      outputs->last_charge_mode = outputs->charge_mode;
+      send_string_p(PSTR("A stop condition was breached. Shutting down. and retrying\r\n"));
+      handle_retries(process);
+    }
+  }
 }
+
+/**
+ * @brief Calculate the led light output for progress indication.
+ * 
+ * The process control happens in a medium timesetep given by
+ * MEDIUM_TIME_INTERVAL, which is 125/55 = MEDIUM_TIME_FRACTION
+ * being 5 times per send. We will denote counts (1,2,3,4,5) as 1/5th of a
+ * second, of colour (r/g) and _ for off
+ * 
+ * There are green and red LED's which will have the following patterns for
+ * the following charge states
+ * CHARGE_MODE_OFF
+ *   Solid green
+ *   gggggggggg
+ * CHARGE_MODE_CONSTANT_CURRENT
+ *   Rapid green blink then pause
+ *   g_g_g_____
+ * CHARGE_MODE_ABSORBTION
+ *   Long 50% duty cycle green blink
+ *   ggggg_____
+ * CHARGE_MODE_CONSTANT_VOLTAGE
+ *   Slower green blink then pause
+ *   gg__gg____
+ * CHARGE_MODE_CONSTANT_POWER
+ *   Rapid green blink alternating with red then pause
+ *   g_g_g_____
+ *   _r_r_r____
+ * CHARGE_MODE_RETRY_WAIT
+ *   Long rapid red  blink the number of retries then pause
+ *   1st retry
+ *     r______
+ *   2nd retry
+ *     r_r______
+ *   5th retry
+ *     r_r_r_r_r______
+ *   nth retry, where n>5
+ *     r_r_r_r_r_r_(pause to rearest second)
+ * CHARGE_MODE_OFF_ERROR
+ *   Solid red
+ *   rrrrrrrrrr
+ **/
+void calculate_lights(struct Process* process)
+{
+  struct Inputs   *inputs   = &process->inputs;
+  struct Outputs  *outputs  = &process->outputs;
+  struct Settings *settings = &process->settings;
+  
+  // Increment position every 'cyclesPerStep'
+  indicatorCounterRaw++;
+  if (indicatorCounterRaw >= SETTINGS_LED_INDICATOR_FREQ) {
+    indicatorCounterRaw = 0;
+    indicatorPosition++;
+    indicatorPosition = indicatorPosition%LED_BLINK_PERIOD;
+  }
+  
+  switch(outputs->charge_mode) {
+    case CHARGE_MODE_OFF: 
+      outputs->led_green  = LED_ON;
+      outputs->led_red    = LED_OFF;
+      break;
+    case CHARGE_MODE_CONSTANT_CURRENT:
+      if (
+        indicatorPosition == 0 ||
+        indicatorPosition == 2 ||
+        indicatorPosition == 4
+      ) {
+        outputs->led_green  = LED_ON;
+      }
+      else
+      {
+        outputs->led_green  = LED_OFF;
+      }
+      outputs->led_red    = LED_OFF;
+      break;
+    case CHARGE_MODE_ABSORBTION:
+      if ( 
+        indicatorPosition < LED_BLINK_PERIOD/2
+      ) {
+        outputs->led_green  = LED_ON;
+      }
+      else
+      {
+        outputs->led_green  = LED_OFF;
+      }
+      outputs->led_red    = LED_OFF;
+      break;
+    case CHARGE_MODE_CONSTANT_VOLTAGE:
+      if ( 
+        indicatorPosition == 0 ||
+        indicatorPosition == 1 ||
+        indicatorPosition == 4 ||
+        indicatorPosition == 5
+      ) {
+        outputs->led_green  = LED_ON;
+      }
+      else
+      {
+        outputs->led_green  = LED_OFF;
+      }
+      outputs->led_red    = LED_OFF;
+      break;
+    case CHARGE_MODE_CONSTANT_POWER:
+      if (
+        indicatorPosition == 1 ||
+        indicatorPosition == 3 ||
+        indicatorPosition == 5
+      ) {
+        outputs->led_green  = LED_ON;
+        outputs->led_red    = LED_OFF;
+      }
+      else if (
+        indicatorPosition == 2 ||
+        indicatorPosition == 4 ||
+        indicatorPosition == 6
+      ) {
+        outputs->led_green  = LED_OFF;
+        outputs->led_red    = LED_ON;
+      }
+      else
+      {
+        outputs->led_green  = LED_OFF;
+        outputs->led_red    = LED_OFF;
+      }   
+      break;
+    case CHARGE_MODE_RETRY_WAIT:
+      // position is even, and less than retries*2
+      // Works for maximum retries <= 5 (2* period)
+      if ( 
+        indicatorPosition%2 == 0 &&
+        indicatorPosition < (outputs->charge_retries*2)
+      ) {
+        outputs->led_red    = LED_ON;
+      }
+      else
+      {
+        outputs->led_red    = LED_OFF;        
+      }
+      outputs->led_green  = LED_OFF;
+      break;
+    case CHARGE_MODE_OFF_ERROR:
+      outputs->led_green  = LED_OFF;
+      outputs->led_red    = LED_ON;
+      break;
+  }    
+}
+
 
 /**
  * @brief Set the calculated outputs to hardware
@@ -585,22 +717,25 @@ void check_limits(struct Process* process)
  **/
 void set_outputs(struct Process* process)
 {
-    struct Outputs *outputs = &process->outputs;
-    set_pwm(PWM_CHAN_A,outputs->pwm_duty);
+  struct Outputs *outputs = &process->outputs;
+  // Set PWM
+  set_pwm(PWM_CHAN_A,outputs->pwm_duty);
+  // Set green LED
+  led_indicators_set(outputs->led_green, outputs->led_red);
 }
 
 /**
  * @brief Enable process control
  **/
 void process_control_enable( void ){
-    processControlEnable = 1;
+  processControlEnable = 1;
 }
 
 /**
  * @brief Disable process control
  **/
 void process_control_disable(void){
-    processControlEnable = 0;
+  processControlEnable = 0;
 }
 
 /**
@@ -651,29 +786,32 @@ void process_control_disable(void){
  **/
 void process_control(struct Process *process)
 {
-    /**make sure only one instance of process_control is running, and is enabled **/
-    if (process_control_running_flag) {
-        return;
-    }
-    
-    if (!processControlEnable){
-        return;
-    }
-    // Process_control is running
-    process_control_running_flag = 1;
-    
-    /**First things first, lets get the system state **/
-    get_state(process);         // That was easy!
-    
-    /** Now lets calculate how to change things to maintain the process **/
-    calculate_outputs(process);
-    
-    /** Now we set the proposed updates to hardware **/
-    set_outputs(process);
-    
-    /** Lets check that nothing has gone wrong or will go wrong if we use these settings **/
-    check_limits(process);
-    
-    //Process_control has finished
-    process_control_running_flag = 0;
+  /**make sure only one instance of process_control is running, and is enabled **/
+  if (process_control_running_flag) {
+    return;
+  }
+  
+  if (!processControlEnable){
+    return;
+  }
+  // Process_control is running
+  process_control_running_flag = 1;
+  
+  /**First things first, lets get the system state **/
+  get_state(process);         // That was easy!
+  
+  /** Now lets calculate how to change things to maintain the process **/
+  calculate_outputs(process);
+  
+  /** Lets check that nothing will go wrong if we use these settings **/
+  check_limits(process);
+  
+  /** calculate the indicator LED's **/
+  calculate_lights(process);
+  
+  /** Now we set the proposed updates to hardware **/
+  set_outputs(process);
+  
+  //Process_control has finished
+  process_control_running_flag = 0;
 }

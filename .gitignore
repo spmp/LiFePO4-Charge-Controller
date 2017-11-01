@@ -1,0 +1,14 @@
+# Ignore the build directory
+**/.build
+
+# Ignore LTSpice simulation files
+**/*.raw
+**/*.log
+
+# Ignore lock files
+**/*#
+
+# Ignore backup and orig files
+**/*.orig
+**/*.bak
+

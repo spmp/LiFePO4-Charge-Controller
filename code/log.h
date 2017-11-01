@@ -17,6 +17,7 @@
 #include "AVR-lib/clock.h"
 #include "process-control.h"
 #include "AVR-lib/lib/pid.h"
+#include "hardware.h"
 
 #ifndef LOG_ENABLE
 #define LOG_ENABLE 0 //1 log enabled, 0 log disabled
