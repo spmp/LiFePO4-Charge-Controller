@@ -85,11 +85,12 @@ uint16_t get_voltage(float slope, float offset){
  **/
 uint16_t get_analog_current(float slope, float offset){
   float currentTmp = read_ADc_pin_linearFunc(A_SENSE_ADC_PIN, A_SENSE_ADC_REF, slope, offset);
-  if (currentTmp >= 0){
-    return currentTmp;
-  } else {
+  if (currentTmp >= CURRENT_MEASURE_MAX){
     return 0;
+  } else if (currentTmp >= 0){
+    return currentTmp;
   }
+  return 0;
 }
 
 /**

@@ -41,11 +41,9 @@
 // Charge modes
 #define CHARGE_MODE_OFF                 1
 #define CHARGE_MODE_CONSTANT_CURRENT    2
-#define CHARGE_MODE_INTERIM             9
-#define CHARGE_MODE_BALANCE             3
-#define CHARGE_MODE_CONSTANT_VOLTAGE    4
-#define CHARGE_MODE_CONSTANT_POWER      5
-#define CHARGE_MODE_ABSORBTION          6
+#define CHARGE_MODE_CONSTANT_VOLTAGE    3
+#define CHARGE_MODE_BALANCE             4
+#define CHARGE_MODE_SPECIAL             6
 #define CHARGE_MODE_RETRY_WAIT          7
 #define CHARGE_MODE_OFF_ERROR           8
 

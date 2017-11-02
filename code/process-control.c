@@ -338,7 +338,8 @@ void calculate_outputs(struct Process* process)
     case CHARGE_MODE_BALANCE: //Constant Current PID
       //Check if cells have finished balancing or the voltage set point has been reached.
       // We detect not balancing as the balancing output turns off when all cells are done
-      if ( inputs->BMS_balancing >= BMSCOMMS_BALANCE_ALL || inputs->voltage >= settings->voltage_balancing) {
+      if ( inputs->BMS_balancing >= BMSCOMMS_BALANCE_ALL || 
+           inputs->voltage >= settings->voltage_balancing) {
         
         // Check if the setpoint has been reached enough times
         setpoint_reached_counter++;
@@ -394,9 +395,8 @@ void calculate_outputs(struct Process* process)
       }
       break;
       
-          case CHARGE_MODE_ABSORBTION: //Constant Current PID
-      //Check if cells have finished balancing or the voltage set point has been reached.
-      // We detect not balancing as the balancing output turns off when all cells are done
+      // Special mode for balancing unil set total volage
+      case CHARGE_MODE_SPECIAL: //Constant Current PID=
       if ( inputs->voltage >= settings->voltage_balancing) {
         
         // Check if the setpoint has been reached enough times
@@ -637,18 +637,6 @@ void calculate_lights(struct Process* process)
       }
       outputs->led_red    = LED_OFF;
       break;
-    case CHARGE_MODE_ABSORBTION:
-      if ( 
-        indicatorPosition < LED_BLINK_PERIOD/2
-      ) {
-        outputs->led_green  = LED_ON;
-      }
-      else
-      {
-        outputs->led_green  = LED_OFF;
-      }
-      outputs->led_red    = LED_OFF;
-      break;
     case CHARGE_MODE_CONSTANT_VOLTAGE:
       if ( 
         indicatorPosition == 0 ||
@@ -664,7 +652,19 @@ void calculate_lights(struct Process* process)
       }
       outputs->led_red    = LED_OFF;
       break;
-    case CHARGE_MODE_CONSTANT_POWER:
+    case CHARGE_MODE_BALANCE:
+      if ( 
+        indicatorPosition < LED_BLINK_PERIOD/2
+      ) {
+        outputs->led_green  = LED_ON;
+      }
+      else
+      {
+        outputs->led_green  = LED_OFF;
+      }
+      outputs->led_red    = LED_OFF;
+      break;
+    case CHARGE_MODE_SPECIAL:
       if (
         indicatorPosition == 1 ||
         indicatorPosition == 3 ||

@@ -23,6 +23,10 @@
 #define UNDER_VPC                         2.8
 #define SHUNT_CURRENT                     900
 
+// We want a fudge factor to in reality ensure that total voltage is not a factor in
+// process control
+#define V_FUDGE                           90
+
 // Time in seconds from power on of circuit to enabing of process control
 // to give the PSU's enough time to stabilie
 #define PSU_WAIT_ON                       10
@@ -46,14 +50,14 @@
 // CC current
 #define SETTINGS_CURRENT_CC               25000
 // Voltage at which CC is complete
-#define SETTINGS_VOLTAGE_CC_CHARGED       NUM_CELLS * CHARGED_VPC * V_MULTIPLIER
+#define SETTINGS_VOLTAGE_CC_CHARGED       (NUM_CELLS * CHARGED_VPC * V_MULTIPLIER) + V_FUDGE
 // PID proportion for CC
 #define SETTINGS_PID_PROPORTION_CC        500
 // PID maximum, effectivly clamps maximum voltage
 #define SETTINGS_PID_MAX_CC               25
 /** Constant Voltage (CV) settings **/
 // Constant voltage setpoint
-#define SETTINGS_VOLTAGE_CV               NUM_CELLS * BALANCING_VPC * V_MULTIPLIER
+#define SETTINGS_VOLTAGE_CV               (NUM_CELLS * BALANCING_VPC * V_MULTIPLIER) + V_FUDGE
 // Max current for CV charge
 #define SETTINGS_CURRENT_CV               25000
 #define SETTINGS_CURRENT_CV_DONE          SHUNT_CURRENT
@@ -62,7 +66,7 @@
 // PID maximum, effectivly clamps maximum voltage
 #define SETTINGS_PID_MAX_CV               30
 /** Balancing ssettings **/
-#define SETTINGS_VOLTAGE_BALANCING        NUM_CELLS * BALANCING_VPC * V_MULTIPLIER
+#define SETTINGS_VOLTAGE_BALANCING        (NUM_CELLS * BALANCING_VPC * V_MULTIPLIER) + V_FUDGE
 #define SETTINGS_CURRENT_BALANCING        SHUNT_CURRENT
 #define SETTINGS_PID_PROPORTION_BALANCING 30
 #define SETTINGS_PID_MAX_BALANCING        SETTINGS_PID_MAX_CC
@@ -76,7 +80,7 @@
 // Absolute maximum current. Shutdown if over
 #define SETTINGS_CURRENT_MAX              35000
 // Absolute maximum battery voltage. Shutdown if over
-#define SETTINGS_VOLTAGE_MAX              NUM_CELLS * OVER_VPC * V_MULTIPLIER
+#define SETTINGS_VOLTAGE_MAX              (NUM_CELLS * OVER_VPC * V_MULTIPLIER) + V_FUDGE
 // Minimum battery voltage. Error or batteries disconnected if under.
 #define SETTINGS_VOLTAGE_MIN              NUM_CELLS * UNDER_VPC * V_MULTIPLIER
 // Maximum temperature of any battery before shutdown.

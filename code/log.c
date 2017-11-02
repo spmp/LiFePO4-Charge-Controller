@@ -84,7 +84,7 @@ void log_to_serial(struct Process *process) {
         send_uint16(0);
         send_string_p(PSTR(" M Bal"));
         break;
-      case CHARGE_MODE_ABSORBTION:
+      case CHARGE_MODE_SPECIAL:
         send_string_p(PSTR(" Csp "));
         send_uint16(settings->current_balancing);
         send_string_p(PSTR(" Vsp "));

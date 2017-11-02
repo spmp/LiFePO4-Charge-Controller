@@ -66,7 +66,7 @@ void command_from_serial(char commandname, uint32_t commandvalue, struct Process
             No command value will return the current setting\r\n \
             \t Q: Program \r\n \
             \t t: time \r\n \
-            \t m: Charge mode (1 stop, 2 CC, 9, Interim, 3 Bal, 4 CV, 5 CP, 6 Abs, 7 Retry)\r\n \
+            \t m: Charge mode (1 stop, 2 CC, 3 CV, 4 Bal, 6 Special, 7 Retry, 8 Off Err)\r\n \
             \t q: CC current\r\n \
             \t a: CC Voltage\r\n \
             \t r: CC Voltage BMS\r\n \

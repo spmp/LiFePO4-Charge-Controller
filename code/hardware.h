@@ -112,6 +112,7 @@
 /** Analog temperature sensor coefficients **/
 #define ANALOG_CURRENT_OFFSET_CODE -10690
 #define ANALOG_CURRENT_SLOPE_CODE  86.067
+#define CURRENT_MEASURE_MAX        50000
 
 // ADC Voltage linear calibration points for high and low current
 #define ANALOG_VOLTAGE_HIGH_A_OFFSET_CODE 96.1
