@@ -297,43 +297,47 @@ void calculate_outputs(struct Process* process)
           outputs->charge_mode = CHARGE_MODE_BALANCE;
           break;
         }
+      } else {
+      // Setpoint is not reached.
+        // Decriment the setpoint counter
+        if ( setpoint_reached_counter > 0 ) 
+        {
+          setpoint_reached_counter--;
+        }
       }
-      else 
+      //If the PSU's are not on/started they must be started/turned-on.
+      if(!startPSUflag)
       {
-        //If the PSU's are not on/started they must be started/turned-on.
-        if(!startPSUflag)
-        {
-          //Start the PSU
-          psu_enable(process);
-        }
-        
-        // Check if the current is greater than the float current
-        if( inputs->current >= settings->current_cv )
-        {
-          settings->PIDoutput = pid_proportional_simple(
-            // Measured value
-            inputs->current,
-            // Set point
-            settings->current_cv,
-            // (P)roportion
-            settings->pid_proportion_cc,
-            // Maximum output value
-            SETTINGS_PID_MAX_CC
-          );
-        } else {
-          settings->PIDoutput = pid_proportional_simple(
-            // Measured value
-            inputs->BMS_max_voltage,
-            // Set point
-            settings->BMS_max_voltage_cv,
-            // Proportional
-            settings->pid_proportion_cv_bms,
-            // Output Max
-            SETTINGS_PID_MAX_CV_BMS
-          );
-        }
-        break;
+        //Start the PSU
+        psu_enable(process);
       }
+      
+      // Check if the current is greater than the float current
+      if( inputs->current >= settings->current_cv )
+      {
+        settings->PIDoutput = pid_proportional_simple(
+          // Measured value
+          inputs->current,
+          // Set point
+          settings->current_cv,
+          // (P)roportion
+          settings->pid_proportion_cc,
+          // Maximum output value
+          SETTINGS_PID_MAX_CC
+        );
+      } else {
+        settings->PIDoutput = pid_proportional_simple(
+          // Measured value
+          inputs->BMS_max_voltage,
+          // Set point
+          settings->BMS_max_voltage_cv,
+          // Proportional
+          settings->pid_proportion_cv_bms,
+          // Output Max
+          SETTINGS_PID_MAX_CV_BMS
+        );
+      }
+      break;
       
     case CHARGE_MODE_BALANCE: //Constant Current PID
       //Check if cells have finished balancing or the voltage set point has been reached.
