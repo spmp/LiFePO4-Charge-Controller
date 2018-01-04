@@ -511,7 +511,6 @@ void check_limits(struct Process* process)
  
   // Initialise static bms_error_count
   static uint8_t bms_error_count = 0;
-  if (bms_error_count > 0 ) bms_error_count--;
 
   uint8_t halt = 0;
   
@@ -522,44 +521,45 @@ void check_limits(struct Process* process)
       send_string_p(PSTR("Over current!"));
       send_newline();
     }
+    
     if (inputs->voltage >= settings->voltage_max) {
       halt++;
       send_string_p(PSTR("Over voltage!"));
       send_newline();
     }
-//     if (inputs->voltage <= settings->voltage_min) {
-//       halt++;
-//       send_string_p(PSTR("Under voltage!"));
-//       send_newline();
-//     }
-    if (inputs->BMS_status != BMSCOMMS_STATUS_OK &&
-        ++bms_error_count >= SETTINGS_BMSCOMMS_ERROR_COUNT) {
-      if (inputs->BMS_status == BMSCOMMS_STATUS_FAULT) {
+    
+    if (inputs->BMS_status != BMSCOMMS_STATUS_OK) {
+      bms_error_count++;
+      
+      if (bms_error_count >= SETTINGS_BMSCOMMS_ERROR_COUNT) {
         halt++;
-        send_string_p(PSTR("BMS comms fault!"));
-        send_newline();
+        bms_error_count = 0;
+        switch (inputs->BMS_status) {
+          case BMSCOMMS_STATUS_FAULT:
+            send_string_p(PSTR("BMS comms fault!"));
+            send_newline();
+            break;
+          
+          case BMSCOMMS_STATUS_OVER_VOLTAGE:
+            send_string_p(PSTR("BMS battery over voltage!"));
+            send_newline();
+            break;
+            
+          case BMSCOMMS_STATUS_OVER_TEMP:
+            send_string_p(PSTR("BMS battery over temperature!"));
+            send_newline();
+            break;
+            
+          case BMSCOMMS_STATUS_UNDER_VOLTAGE:
+            send_string_p(PSTR("BMS battery under voltage!"));
+            send_newline();
+            break;
+        }
       }
-      if (inputs->BMS_status == BMSCOMMS_STATUS_OVER_VOLTAGE) {
-        halt++;
-        send_string_p(PSTR("BMS battery over voltage!"));
-        send_newline();
-      }
-      if (inputs->BMS_status == BMSCOMMS_STATUS_OVER_TEMP) {
-        halt++;
-        send_string_p(PSTR("BMS battery over temperature!"));
-        send_newline();
-      }
-      if (inputs->BMS_status == BMSCOMMS_STATUS_UNDER_VOLTAGE) {
-        halt++;
-        send_string_p(PSTR("BMS battery under voltage!"));
-        send_newline();
-      }
-      if (inputs->BMS_status > BMSCOMMS_STATUS_UNDER_VOLTAGE) {
-        halt++;
-        send_string_p(PSTR("BMS unknown fault!"));
-        send_newline();
-      }
+    } else {
+      if (bms_error_count > 0 ) bms_error_count--;
     }
+    
     if(halt != 0){
       outputs->last_charge_mode = outputs->charge_mode;
       send_string_p(PSTR("A stop condition was breached. Shutting down. and retrying\r\n"));
